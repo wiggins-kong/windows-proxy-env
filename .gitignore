@@ -1,0 +1,21 @@
+# Rust/Tauri 构建产物
+src-tauri/target/
+dist/
+
+# Node
+node_modules/
+package-lock.json
+
+# WorkBuddy 工作区数据（不推送）
+.workbuddy/
+
+# 临时
+*.log
+.DS_Store
+Thumbs.db
+
+# 图标生成脚本与源图（保留源可自行重新生成，产物由 tauri icon 生成在 src-tauri/icons/）
+# app-icon.png
+# make_icon.py
+# 构建生成的 schema
+src-tauri/gen/

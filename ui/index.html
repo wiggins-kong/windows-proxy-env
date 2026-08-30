@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProxyEnv</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- 自绘标题栏（拖拽与按钮均由 JS 显式绑定） -->
+  <div class="titlebar">
+    <div class="tb-left" id="tb-left">
+      <svg class="app-logo" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <defs>
+          <linearGradient id="pe-logo-g" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#0b57d0"/>
+            <stop offset="1" stop-color="#3c91ff"/>
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="22" height="22" rx="5.5" fill="url(#pe-logo-g)"/>
+        <circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="1.7"/>
+        <circle cx="7.6" cy="16.4" r="2" fill="#fff"/>
+        <circle cx="16.4" cy="7.6" r="2" fill="#fff"/>
+        <path d="M8.8 11.2a4 4 0 016.4 0" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      <span>ProxyEnv 代理开关</span>
+    </div>
+    <div class="tb-right">
+      <button class="tb-btn" id="btn-settings" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3.2"/>
+          <circle cx="12" cy="12" r="8"/>
+          <g stroke-linecap="round">
+            <path d="M12 1.5v2.4"/>
+            <path d="M12 20.1v2.4"/>
+            <path d="M1.5 12h2.4"/>
+            <path d="M20.1 12h2.4"/>
+            <path d="M4.6 4.6l1.7 1.7"/>
+            <path d="M17.7 17.7l1.7 1.7"/>
+            <path d="M19.4 4.6l-1.7 1.7"/>
+            <path d="M6.3 17.7l-1.7 1.7"/>
+          </g>
+        </svg>
+      </button>
+      <button class="tb-btn" id="btn-min" title="最小化" aria-label="最小化">
+        <svg viewBox="0 0 12 12" width="10" height="10"><path fill="currentColor" d="M1 5.5h10V6.5H1z"/></svg>
+      </button>
+      <button class="tb-btn tb-close" id="btn-close" title="关闭到托盘" aria-label="关闭">
+        <svg viewBox="0 0 12 12" width="10" height="10"><path fill="currentColor" d="M2.4 1.3l4.6 4.6 4.6-4.6.8.8L7.8 6.7l4.6 4.6-.8.8-4.6-4.6-4.6 4.6-.8-.8L6.2 6.7 1.6 2.1l.8-.8z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- ① 代理配置 -->
+    <section class="card">
+      <div class="card-head"><h2>代理配置</h2><span class="badge" id="state-badge">检测中</span></div>
+
+      <div class="field">
+        <label>连接协议</label>
+        <div class="proto-seg" id="proto-seg" role="radiogroup" aria-label="连接协议">
+          <button data-type="HTTP" class="seg active" type="button">HTTP</button>
+          <button data-type="SOCKS5" class="seg" type="button">SOCKS5</button>
+          <button data-type="SOCKS5h" class="seg" type="button">SOCKS5h</button>
+        </div>
+        <p class="proto-hint" id="proto-hint">HTTP 将写入 HTTP_PROXY 与 HTTPS_PROXY</p>
+      </div>
+
+      <div class="row">
+        <div class="field grow">
+          <label for="host">服务器地址</label>
+          <input id="host" type="text" placeholder="127.0.0.1" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field port">
+          <label for="port">端口</label>
+          <input id="port" type="number" min="1" max="65535" value="7890">
+        </div>
+      </div>
+
+      <!-- 高级选项 -->
+      <button class="adv-head" id="adv-toggle" type="button">
+        <span>高级选项</span>
+        <svg class="chevron" id="adv-chevron" viewBox="0 0 16 16" width="14" height="14">
+          <path fill="currentColor" d="M4.5 6l3.5 3.5L11.5 6l.7.7-4.2 4.2L3.8 6.7z"/>
+        </svg>
+      </button>
+      <div class="adv-body hidden" id="adv-body">
+
+        <div class="adv-sub">
+          <label class="adv-sub-title">认证（可选）</label>
+          <div class="row">
+            <div class="field grow"><input id="username" type="text" placeholder="用户名" autocomplete="off" spellcheck="false"></div>
+            <div class="field grow"><input id="password" type="password" placeholder="密码"></div>
+          </div>
+        </div>
+
+        <div class="adv-sub">
+          <label class="adv-sub-title" for="no-proxy">NO_PROXY 豁免（逗号分隔）</label>
+          <input id="no-proxy" type="text" spellcheck="false" placeholder="localhost,127.0.0.1,::1">
+        </div>
+
+        <div class="adv-sub">
+          <label class="switch-row">
+            <span>高级模式（手动编辑变量）</span>
+            <input type="checkbox" id="use-advanced">
+            <span class="sw"></span>
+          </label>
+          <div class="adv-vars">
+            <div class="field"><label for="adv-http">HTTP_PROXY</label><input id="adv-http" type="text" spellcheck="false" placeholder="http://127.0.0.1:7890"></div>
+            <div class="field"><label for="adv-https">HTTPS_PROXY</label><input id="adv-https" type="text" spellcheck="false" placeholder="http://127.0.0.1:7890"></div>
+            <div class="field"><label for="adv-all">ALL_PROXY</label><input id="adv-all" type="text" spellcheck="false" placeholder="socks5h://127.0.0.1:7891"></div>
+            <div class="field"><label for="adv-noproxy">NO_PROXY</label><input id="adv-noproxy" type="text" spellcheck="false" placeholder="localhost,127.0.0.1,::1"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ② 主操作 -->
+    <section class="card ops-card">
+      <button class="master" id="btn-master" type="button">
+        <span class="master-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5"/>
+          </svg>
+        </span>
+        <span class="master-text" id="master-text">启用代理</span>
+      </button>
+      <div class="ops-sub">
+        <button class="btn" id="btn-test" type="button">测试连通性</button>
+        <button class="btn" id="btn-clear" type="button">清除代理</button>
+      </div>
+      <div class="test-result hidden" id="test-result"></div>
+    </section>
+
+    <!-- ③ 状态条 -->
+    <div class="state-strip" id="state-strip" title="当前用户级环境变量"></div>
+
+  </main>
+
+  <!-- 设置弹窗 -->
+  <div class="modal-overlay hidden" id="modal-settings">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="设置" tabindex="-1">
+      <div class="modal-head">
+        <h2>设置</h2>
+        <button class="modal-close" id="modal-close" aria-label="关闭设置">
+          <svg viewBox="0 0 12 12" width="11" height="11"><path fill="currentColor" d="M2.4 1.3l4.6 4.6 4.6-4.6.8.8L7.8 6.7l4.6 4.6-.8.8-4.6-4.6-4.6 4.6-.8-.8L6.2 6.7 1.6 2.1l.8-.8z"/></svg>
+        </button>
+      </div>
+      <div class="modal-tabs">
+        <button class="seg active" data-tab="general" type="button">常规</button>
+        <button class="seg" data-tab="appearance" type="button">外观</button>
+      </div>
+      <div class="modal-body">
+        <div class="tab-pane" id="tab-general">
+          <label class="switch-row">
+            <span>开机自启</span>
+            <input type="checkbox" id="autostart">
+            <span class="sw"></span>
+          </label>
+          <p class="hint-text">开启后随 Windows 启动，启动时保持在系统托盘</p>
+        </div>
+        <div class="tab-pane hidden" id="tab-appearance">
+          <div class="field">
+            <label>主题</label>
+            <div class="theme-seg block" id="theme-seg" role="radiogroup" aria-label="主题">
+              <button data-theme-val="system" class="seg active" type="button">跟随系统</button>
+              <button data-theme-val="light" class="seg" type="button">浅色</button>
+              <button data-theme-val="dark" class="seg" type="button">深色</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="font-select">程序字体</label>
+            <select id="font-select">
+              <option value="">默认（跟随系统 UI 字体）</option>
+              <option value="Microsoft YaHei UI">微软雅黑 UI</option>
+              <option value="Microsoft YaHei">微软雅黑</option>
+              <option value="Segoe UI Variable">Segoe UI Variable</option>
+              <option value="Segoe UI">Segoe UI</option>
+              <option value="HarmonyOS Sans SC">HarmonyOS Sans SC</option>
+              <option value="PingFang SC">苹方 PingFang SC</option>
+              <option value="SimHei">黑体 SimHei</option>
+              <option value="SimSun">宋体 SimSun</option>
+              <option value="KaiTi">楷体 KaiTi</option>
+              <option value="DengXian">等线 DengXian</option>
+              <option value="Consolas">Consolas（等宽）</option>
+              <option value="Arial">Arial</option>
+              <option value="Times New Roman">Times New Roman</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="font-size">字体大小</label>
+            <div class="row slider-row">
+              <input id="font-size" type="range" min="11" max="18" step="1">
+              <span class="size-val" id="size-val">13 px</span>
+            </div>
+          </div>
+          <div class="var-preview font-preview">
+            <span class="vp-label">预览</span>
+            <code>代理设置一目了然 · 0123456789</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
