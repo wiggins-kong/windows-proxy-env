@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (stable, MSVC)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build release exe
+        shell: bash
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml
+
+      - name: Create Release & upload exe
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/ProxyEnv.exe
+          name: Windows Proxy Env ${{ github.ref_name }}
+          body: |
+            ## Windows Proxy Env v1.0
+
+            便携单文件（约 4.5 MB），免安装、免管理员权限，解压双击即用。
+            Windows 10/11（需 WebView2 运行时，通常随 Edge 自带）。
+
+            **使用**：填代理地址 → 点「启用代理」→ 新开的终端立即生效；
+            「测试连通性」验证链路，「清除代理」一键还原。
+            支持 HTTP / SOCKS4/4a/5/5h、认证代理、高级变量、托盘常驻、开机自启。
+
+            > 未签名：首次运行 SmartScreen 提示时请选择「仍要运行」。
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
