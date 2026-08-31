@@ -339,6 +339,42 @@ body[data-theme="dark"] .master.off { color: var(--text); }
 .test-result.ok { background: var(--ok-soft); color: var(--ok); }
 .test-result.fail { background: var(--danger-soft); color: var(--danger); }
 
+/* ===== 配置已更改横幅 ===== */
+.apply-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-card);
+  background: var(--warn-soft);
+  font-size: var(--fs);
+  color: var(--warn);
+  animation: bannerIn .18s ease;
+}
+@keyframes bannerIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ab-icon { display: grid; place-items: center; flex-shrink: 0; }
+.ab-text { flex: 1; font-weight: 600; line-height: 1.4; }
+.ab-btn {
+  flex-shrink: 0;
+  border: none;
+  background: var(--warn);
+  color: #fff;
+  font-size: var(--fs);
+  font-weight: 600;
+  font-family: inherit;
+  padding: 6px 14px;
+  border-radius: var(--radius-ctl);
+  cursor: pointer;
+  transition: filter .15s, transform .1s;
+}
+.ab-btn:hover { filter: brightness(1.1); }
+.ab-btn:active { transform: scale(.97); }
+body[data-theme="dark"] .ab-btn { color: #1c1c1c; }
+
 /* ===== 状态条（每变量一行） ===== */
 .state-strip {
   display: flex;

@@ -12,9 +12,11 @@
 - **变量映射**：HTTP 系写入 `HTTP_PROXY` / `HTTPS_PROXY`；SOCKS 系写入 `ALL_PROXY`；始终写入 `NO_PROXY`
 - **认证代理**：可选用户名 / 密码，自动拼入 `user:pass@` 形式
 - **高级模式**：手动编辑四个变量值，完全自定义
-- **连通测试**：内置走代理访问 `generate_204` 测速，显示延迟
+- **连通测试**：内置走代理访问 `generate_204` 测速，显示延迟；未应用更改时标注「按当前表单值测试」
+- **配置已更改横幅**：代理启用中修改任一参数，出现「配置已更改 · 尚未生效」横幅，点「应用更改」无感重写并保持启用（避免"改了没生效"陷阱）
 - **一键清除**：清除全部 4 个相关变量
 - **托盘常驻**：左键单击打开主界面，右键弹出菜单（启用 / 停用 / 测试 / 退出）；关窗最小化到托盘
+- **托盘状态图标**：启用 = 彩色 logo + 绿色角标；停用 = 灰度 logo + 灰色角标；悬停 tooltip 显示状态与地址；菜单随状态置灰
 - **开机自启**：可选（写入 `HKCU\...\Run`）
 - **外观设置**：主题三态、13 种字体、字号滑杆（11–18px），持久化到配置
 - **单实例保护**：重复启动时聚焦已有窗口
@@ -69,6 +71,8 @@ cp target/release/ProxyEnv.exe ../dist/ProxyEnv.exe
 - [x] 配置持久化（`%APPDATA%\ProxyEnv\config.json`）
 - [x] 连通性测试（reqwest / rustls / socks）
 - [x] 托盘（左键开窗 / 右键菜单）与单实例保护
+- [x] 托盘状态图标（启用彩色+绿点 / 停用灰度+灰点，tooltip 与菜单联动）
+- [x] 配置已更改横幅（启用中改参数 → 应用更改无感重写）
 - [x] 自绘标题栏（拖拽 + 设置 / 最小化 / 关闭）
 - [x] Fluent 风格 UI 重设计：协议分段选择、主操作卡、4 行状态条、设置弹窗（Tab：常规 / 外观）
 - [x] 三态主题、字体 / 字号自定义（持久化）
@@ -79,12 +83,12 @@ cp target/release/ProxyEnv.exe ../dist/ProxyEnv.exe
 - **标题栏点不动 / 拖不动**：`capabilities` 缺失导致核心窗口命令（`plugin:window|*`）被 ACL 拒绝 → 补 `capabilities/default.json`（`core:default` + 显式窗口权限）
 - **只改前端不生效**：内嵌资源仅在 Rust 重编译时更新 → 构建须 `touch src/main.rs`（见"构建"）；固化 `scripts/build.sh`
 - **设置按钮逻辑取反**：视图切换判断写反 → 修正为 `showView(contains("hidden"))`
+- **build.sh 资源校验中断**：系统 `python3` 缺 brotli 导致 `set -e` 中断、`cp dist` 未执行 → 自动探测 brotli 环境（回退 venv，均无则跳过校验继续）
 - 其他：modal 关闭按钮焦点环、标题栏 logo 与 exe 图标统一、停用图标清晰化、状态条分行、下拉箭头 SVG 化
 
 ### 📋 后续候选
 - [ ] 代码签名（消除 SmartScreen 提示）
 - [ ] 图标微调 / 多语言
-- [ ] GitHub Release 发布便携 exe
 
 ## 许可证
 

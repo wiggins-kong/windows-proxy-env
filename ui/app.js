@@ -45,6 +45,8 @@ const els = {
   clearBtn: $("btn-clear"),
   testResult: $("test-result"),
   stateStrip: $("state-strip"),
+  applyBanner: $("apply-banner"),
+  btnApply: $("btn-apply"),
   autostart: $("autostart"),
   themeSeg: $("theme-seg"),
   toast: $("toast"),
@@ -212,6 +214,7 @@ els.protoSeg.addEventListener("click", (e) => {
   if (!btn) return;
   els.protoSeg.querySelectorAll(".seg").forEach((s) => s.classList.toggle("active", s === btn));
   updatePreview();
+  syncBanner();
 });
 
 function renderProtoHint() {
@@ -287,6 +290,86 @@ function updatePreview() {
   renderProtoHint();
 }
 
+/* ---------- 配置脏检测（与 Rust proxy_rules 逻辑对齐） ---------- */
+function rustUrlEncode(s) {
+  // 模拟 urlencoding crate：除 unreserved 外全部百分号编码
+  return encodeURIComponent(s).replace(/[!'()*]/g, (c) =>
+    "%" + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
+function buildProxyUrl(s, scheme) {
+  let url = scheme + "://";
+  if (s.username) {
+    url += rustUrlEncode(s.username);
+    if (s.password) url += ":" + rustUrlEncode(s.password);
+    url += "@";
+  }
+  url += s.host.trim();
+  url += ":" + s.port;
+  return url;
+}
+
+const SOCKS_SCHEMES = { SOCKS4: "socks4", SOCKS4a: "socks4a", SOCKS5: "socks5", SOCKS5h: "socks5h" };
+
+/** 由当前表单推导"应写入"的变量集（剔除空值，与 read_var 过滤一致） */
+function computePreviewVars() {
+  const s = collectSettings();
+  const vars = {};
+  if (s.use_advanced) {
+    const a = s.advanced || {};
+    for (const [n, v] of [
+      ["HTTP_PROXY", a.http_proxy],
+      ["HTTPS_PROXY", a.https_proxy],
+      ["ALL_PROXY", a.all_proxy],
+      ["NO_PROXY", a.no_proxy],
+    ]) {
+      if (v && v.trim()) vars[n] = v.trim();
+    }
+    return vars;
+  }
+  const isSocks = s.proxy_type in SOCKS_SCHEMES;
+  if (s.host.trim()) {
+    const scheme = isSocks ? SOCKS_SCHEMES[s.proxy_type] : "http";
+    const u = buildProxyUrl(s, scheme);
+    if (isSocks) vars.ALL_PROXY = u;
+    else { vars.HTTP_PROXY = u; vars.HTTPS_PROXY = u; }
+  }
+  if (s.no_proxy.trim()) vars.NO_PROXY = s.no_proxy.trim();
+  return vars;
+}
+
+function currentEnvVars() {
+  const e = (state && state.env) || {};
+  const vars = {};
+  for (const [k, kk] of [
+    ["HTTP_PROXY", "http_proxy"],
+    ["HTTPS_PROXY", "https_proxy"],
+    ["ALL_PROXY", "all_proxy"],
+    ["NO_PROXY", "no_proxy"],
+  ]) {
+    if (e[kk]) vars[k] = e[kk];
+  }
+  return vars;
+}
+
+/** 表单当前推导 ≠ 实际生效 → 有未应用更改 */
+function isDirty() {
+  const p = computePreviewVars();
+  const e = currentEnvVars();
+  const keys = new Set([...Object.keys(p), ...Object.keys(e)]);
+  for (const k of keys) {
+    if ((p[k] || "") !== (e[k] || "")) return true;
+  }
+  return false;
+}
+
+/** 仅在"启用中"显示横幅；停用/未启用隐藏 */
+function syncBanner() {
+  const show = !!(state && state.env.active && isDirty());
+  els.applyBanner.classList.toggle("hidden", !show);
+}
+
 /* ---------- 状态渲染 ---------- */
 function renderState(env) {
   // 强制状态条纵向布局（inline 优先，不受样式表/缓存影响）
@@ -328,6 +411,7 @@ function renderState(env) {
         : "M5 12.5l4.5 4.5L19 7.5" // 勾
     );
   }
+  syncBanner();
 }
 
 /* ---------- 核心操作 ---------- */
@@ -357,15 +441,17 @@ async function doClear() {
 async function doTest() {
   els.testResult.classList.add("hidden");
   els.testBtn.textContent = "测试中…";
+  const dirty = isDirty();
+  const label = dirty ? "按当前表单值测试（未应用）· " : "";
   try {
     const r = await invoke("test_proxy", { settings: collectSettings() });
     els.testResult.classList.remove("hidden");
     if (r.ok) {
       els.testResult.className = "test-result ok";
-      els.testResult.textContent = `连接成功 · 延迟 ${r.latency_ms} ms`;
+      els.testResult.textContent = label + `连接成功 · 延迟 ${r.latency_ms} ms`;
     } else {
       els.testResult.className = "test-result fail";
-      els.testResult.textContent = `连接失败：${r.error || "未知错误"}`;
+      els.testResult.textContent = label + `连接失败：${r.error || "未知错误"}`;
     }
   } catch (e) {
     els.testResult.className = "test-result fail";
@@ -417,9 +503,46 @@ els.clearBtn.addEventListener("pointerdown", async (e) => {
 });
 
 els.testBtn.addEventListener("click", doTest);
-els.host.addEventListener("input", updatePreview);
-els.port.addEventListener("input", updatePreview);
-els.useAdvanced.addEventListener("change", updatePreview);
+
+/* 所有会影响写入变量的输入变化 → 更新预告 + 脏检测 */
+const formInputs = [
+  els.host, els.port, els.username, els.password, els.noProxy,
+  els.useAdvanced, els.advHttp, els.advHttps, els.advAll, els.advNoProxy,
+];
+formInputs.forEach((el) =>
+  el.addEventListener("input", () => {
+    updatePreview();
+    syncBanner();
+  })
+);
+els.noProxy.addEventListener("change", syncBanner);
+els.advNoProxy.addEventListener("change", syncBanner);
+els.username.addEventListener("change", syncBanner);
+els.password.addEventListener("change", syncBanner);
+els.useAdvanced.addEventListener("change", () => {
+  updatePreview();
+  syncBanner();
+});
+
+/* 应用更改：无感重写 + 保存，保持启用 */
+els.btnApply.addEventListener("pointerdown", async (e) => {
+  e.preventDefault();
+  const s = collectSettings();
+  if (!s.use_advanced && !s.host.trim()) {
+    toast("请先填写代理地址", true);
+    els.host.focus();
+    return;
+  }
+  try {
+    const r = await invoke("apply_proxy", { settings: s });
+    state = r;
+    renderState(r.env);
+    updatePreview();
+    toast("配置已应用，新终端立即生效");
+  } catch (err) {
+    toast("应用失败：" + err, true);
+  }
+});
 
 els.advToggle.addEventListener("pointerdown", (e) => {
   e.preventDefault();

@@ -134,6 +134,17 @@
       <div class="test-result hidden" id="test-result"></div>
     </section>
 
+    <!-- ②.5 配置已更改横幅 -->
+    <div class="apply-banner hidden" id="apply-banner" role="status" aria-live="polite">
+      <span class="ab-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="14" height="14">
+          <path fill="currentColor" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm-.6 3.1h1.2v4.6H7.4V4.6zm0 6h1.2v1.3H7.4V10.6z"/>
+        </svg>
+      </span>
+      <span class="ab-text">配置已更改 · 尚未生效</span>
+      <button class="ab-btn" id="btn-apply" type="button">应用更改</button>
+    </div>
+
     <!-- ③ 状态条 -->
     <div class="state-strip" id="state-strip" title="当前用户级环境变量"></div>
 
