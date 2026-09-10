@@ -6,6 +6,34 @@
 
 项目已经完成 Windows 便携版的核心功能和 GitHub Actions 发布链路。当前重点从功能开发转为发布稳定性、文档维护和后续签名支持。
 
+## 当前迭代：HTTP(S) 与 SOCKS 双通道 UI
+
+状态：交互方案已确认，静态 HTML Demo 已完成；正式 `ui/` 和 Rust 后端尚未改造。
+
+目标行为：
+
+- HTTP(S) 与 SOCKS 是两个可独立启用的通道，可以单独使用，也可以同时启用。
+- HTTP(S) 写 `HTTP_PROXY` 和 `HTTPS_PROXY`。
+- SOCKS 写 `ALL_PROXY`，协议可选 `socks5://` 或 `socks5h://`。
+- 两个通道共用 `NO_PROXY`，地址、端口和认证配置相互独立。
+- HTTP(S) 已启用时，SOCKS 默认复用其地址和认证；HTTP(S) 关闭后，SOCKS 自动展开为独立地址。
+- 高级模式仍以四个变量手动覆盖普通模式。
+- UI 需明确说明 `HTTP_PROXY` / `HTTPS_PROXY` 优先，`ALL_PROXY` 是兜底，二者不是串联关系。
+- 连通性测试分别显示 HTTP(S) 和 SOCKS 两条通道的结果。
+
+当前交付物：
+
+- `demo/index.html`：可直接用浏览器打开的单文件交互 Demo，不会实际修改环境变量。
+- Demo 已覆盖独立开关、SOCKS5/SOCKS5h 切换、地址复用、实时变量预览、高级模式、双通道测试和响应式布局。
+
+下一步：
+
+1. 确认并冻结 Demo 的交互与视觉方案。
+2. 调整配置模型，持久化两套独立代理配置及启用状态。
+3. 调整 `proxy_rules.rs` 和 `env_util.rs` 的变量构建、写入与清除逻辑。
+4. 将确认后的 UI 合并进正式 `ui/`，移除只允许单协议生效的逻辑。
+5. 补充双通道组合、SOCKS5h、复用地址和高级模式覆盖的手动验证。
+
 ## 已完成
 
 - [x] Tauri 2 + Rust + 原生 HTML/CSS/JS 项目骨架
@@ -55,6 +83,8 @@
 npm install
 ```
 
+如果项目已配置 Rust 和 Node.js，只需在克隆后执行一次。
+
 ### 本地构建
 
 推荐使用构建脚本，它会强制重新嵌入前端资源、校验资源并复制到 `dist/`：
@@ -73,6 +103,16 @@ Copy-Item .\target\release\proxyenv.exe ..\dist\ProxyEnv.exe -Force
 ```
 
 产物路径：`dist/ProxyEnv.exe`
+
+### 跨设备接续
+
+换到新电脑后：
+
+1. 安装 Git、Rust stable MSVC、Node.js 和 WebView2。
+2. 克隆仓库 `https://github.com/wiggins-kong/windows-proxy-env.git`。
+3. 执行 `npm install` 安装 Tauri CLI；Python 3、`brotli` 和 Pillow 仅在构建校验或重建图标时需要。
+4. 阅读本文件“当前迭代”和 `方案.md`，以当前提交中的 `demo/index.html` 作为 UI 基线继续开发。
+5. 修改正式代码前先执行一次 `git status`，确认没有未提交的本地改动。
 
 ## 发布流程
 
