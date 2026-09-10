@@ -9,10 +9,10 @@ mod test;
 use config::Settings;
 use env_util::EnvStatus;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri::image::Image;
 use tauri::menu::MenuItem;
 use tauri::tray::TrayIcon;
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use test::TestResult;
 
 #[derive(Serialize)]
@@ -35,14 +35,22 @@ fn sync_tray(app: &AppHandle) {
     if env.active {
         let icon = Image::from_bytes(include_bytes!("../icons/tray-on.png")).ok();
         let _ = st.tray.set_icon(icon);
-        let url = env.all_proxy.as_deref().or(env.http_proxy.as_deref()).unwrap_or("");
-        let _ = st.tray.set_tooltip(Some(format!("ProxyEnv · 代理已启用 {url}")));
+        let url = env
+            .all_proxy
+            .as_deref()
+            .or(env.http_proxy.as_deref())
+            .unwrap_or("");
+        let _ = st
+            .tray
+            .set_tooltip(Some(format!("ProxyEnv · 代理已启用 {url}")));
         let _ = st.enable.set_enabled(false);
         let _ = st.disable.set_enabled(true);
     } else {
         let icon = Image::from_bytes(include_bytes!("../icons/tray-off.png")).ok();
         let _ = st.tray.set_icon(icon);
-        let _ = st.tray.set_tooltip(Some("ProxyEnv · 代理已停用".to_string()));
+        let _ = st
+            .tray
+            .set_tooltip(Some("ProxyEnv · 代理已停用".to_string()));
         let _ = st.enable.set_enabled(true);
         let _ = st.disable.set_enabled(false);
     }
@@ -72,14 +80,20 @@ fn get_state() -> Snapshot {
 fn apply_proxy(app: AppHandle, settings: Settings) -> Result<Snapshot, String> {
     apply_impl(&settings)?;
     sync_tray(&app);
-    Ok(Snapshot { settings, env: env_util::read_status() })
+    Ok(Snapshot {
+        settings,
+        env: env_util::read_status(),
+    })
 }
 
 #[tauri::command]
 fn clear_proxy(app: AppHandle) -> Result<Snapshot, String> {
     env_util::clear_all()?;
     sync_tray(&app);
-    Ok(Snapshot { settings: config::load(), env: env_util::read_status() })
+    Ok(Snapshot {
+        settings: config::load(),
+        env: env_util::read_status(),
+    })
 }
 
 #[tauri::command]
@@ -194,10 +208,7 @@ fn main() {
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &enable, &disable, &test, &quit])?;
             // 显式指定托盘图标：避免依赖 tauri.conf.json 的 trayIcon（会自动多建一个空托盘）
-            let icon = app
-                .default_window_icon()
-                .cloned()
-                .ok_or("缺少应用图标")?;
+            let icon = app.default_window_icon().cloned().ok_or("缺少应用图标")?;
             let tray = tauri::tray::TrayIconBuilder::new()
                 .icon(icon)
                 .menu(&menu)
@@ -216,7 +227,11 @@ fn main() {
                     }
                 })
                 .build(app)?;
-            app.manage(TrayState { tray, enable, disable });
+            app.manage(TrayState {
+                tray,
+                enable,
+                disable,
+            });
 
             // 启动即按真实状态初始化托盘外观
             sync_tray(app.handle());

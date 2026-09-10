@@ -11,7 +11,11 @@ pub struct TestResult {
 }
 
 fn err(msg: String) -> TestResult {
-    TestResult { ok: false, latency_ms: 0, error: Some(msg) }
+    TestResult {
+        ok: false,
+        latency_ms: 0,
+        error: Some(msg),
+    }
 }
 
 /// 用当前设置生成代理 URL 字符串（用于测试）
@@ -65,12 +69,20 @@ pub async fn run(s: &Settings) -> TestResult {
     };
 
     let start = Instant::now();
-    match client.get("https://www.gstatic.com/generate_204").send().await {
+    match client
+        .get("https://www.gstatic.com/generate_204")
+        .send()
+        .await
+    {
         Ok(resp) => {
             let ms = start.elapsed().as_millis() as u64;
             let code = resp.status();
             if code.is_success() {
-                TestResult { ok: true, latency_ms: ms, error: None }
+                TestResult {
+                    ok: true,
+                    latency_ms: ms,
+                    error: None,
+                }
             } else {
                 TestResult {
                     ok: false,
@@ -79,6 +91,10 @@ pub async fn run(s: &Settings) -> TestResult {
                 }
             }
         }
-        Err(e) => TestResult { ok: false, latency_ms: 0, error: Some(e.to_string()) },
+        Err(e) => TestResult {
+            ok: false,
+            latency_ms: 0,
+            error: Some(e.to_string()),
+        },
     }
 }

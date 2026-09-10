@@ -5,20 +5,23 @@
 #       必须 touch src/main.rs 强制重编译，才会重新压缩并嵌入 ui/ 资源。
 set -e
 cd "$(dirname "$0")/../src-tauri"
+TARGET_DIR="${CARGO_TARGET_DIR:-target}"
 
 echo "== 强制重编译（touch main.rs 以重新嵌入前端资源） =="
 touch src/main.rs
-cargo build --release
+cargo build --release --target-dir "$TARGET_DIR"
 
 echo "== 校验嵌入资源 =="
-ASSET_DIR=$(find target/release/build -path "*out/tauri-codegen-assets" -type d -newer Cargo.toml 2>/dev/null | head -1 || true)
+ASSET_DIR=$(find "$TARGET_DIR/release/build" -path "*out/tauri-codegen-assets" -type d -newer Cargo.toml 2>/dev/null | head -1 || true)
 if [ -n "$ASSET_DIR" ]; then
   PYTHON=""
-  if python3 -c "import brotli" 2>/dev/null; then
-    PYTHON=python3
-  elif "C:/Users/wiggins/.workbuddy/binaries/python/envs/default/Scripts/python.exe" -c "import brotli" 2>/dev/null; then
-    PYTHON="C:/Users/wiggins/.workbuddy/binaries/python/envs/default/Scripts/python.exe"
-  fi
+  for CANDIDATE in "${PYTHON:-}" python3 python; do
+    [ -n "$CANDIDATE" ] || continue
+    if command -v "$CANDIDATE" >/dev/null 2>&1 && "$CANDIDATE" -c "import brotli" 2>/dev/null; then
+      PYTHON="$CANDIDATE"
+      break
+    fi
+  done
   if [ -n "$PYTHON" ]; then
     "$PYTHON" - "$ASSET_DIR" <<'PY'
 import brotli, glob, os, sys
@@ -42,5 +45,5 @@ fi
 
 echo "== 分发到 dist =="
 mkdir -p ../dist
-cp target/release/ProxyEnv.exe ../dist/ProxyEnv.exe
+cp "$TARGET_DIR/release/ProxyEnv.exe" ../dist/ProxyEnv.exe
 echo "完成: ../dist/ProxyEnv.exe ($(du -h ../dist/ProxyEnv.exe | cut -f1))"

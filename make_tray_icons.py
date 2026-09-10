@@ -4,11 +4,15 @@
 16px 托盘显示时绿色/灰色角标清晰可辨，整体颜色差异一眼区分启停。
 图形整体较 1024 版 logo 放大 ~20%（环 38→46px），小尺寸下更醒目。
 """
+from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 SIZE = 64
-ON_PNG = r"E:\WorkBuddy\Proxy_Env\src-tauri\icons\tray-on.png"
-OFF_PNG = r"E:\WorkBuddy\Proxy_Env\src-tauri\icons\tray-off.png"
+ROOT = Path(__file__).resolve().parent
+ICONS = ROOT / "src-tauri" / "icons"
+ON_PNG = ICONS / "tray-on.png"
+OFF_PNG = ICONS / "tray-off.png"
 
 
 def make(bg_top, bg_bottom, status):

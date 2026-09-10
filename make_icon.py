@@ -1,7 +1,10 @@
 """生成 ProxyEnv 应用图标（1024x1024 PNG）：Win11 风格渐变 + 转发链路符号"""
+from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 SIZE = 1024
+ROOT = Path(__file__).resolve().parent
 img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
 draw = ImageDraw.Draw(img)
 
@@ -38,5 +41,6 @@ draw.ellipse([cx + 195 - r_node, cy - 195 - r_node, cx + 195 + r_node, cy - 195 
 bbox = [cx - 90, cy - 90, cx + 90, cy + 90]
 draw.arc(bbox, start=-20, end=200, fill=white, width=40)
 
-img.save(r"E:\WorkBuddy\Proxy_Env\app-icon.png")
-print("icon saved", img.size)
+output = ROOT / "app-icon.png"
+img.save(output)
+print("icon saved", img.size, output)

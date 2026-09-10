@@ -6,9 +6,6 @@ dist/
 node_modules/
 package-lock.json
 
-# WorkBuddy 工作区数据（不推送）
-.workbuddy/
-
 # 临时
 *.log
 .DS_Store

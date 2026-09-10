@@ -23,8 +23,8 @@ pub struct Settings {
     pub advanced: Option<AdvancedVars>,
     pub use_advanced: bool,
     pub autostart: bool,
-    pub theme: String, // system / light / dark
-    pub font: String,  // 自定义程序字体（空 = 默认）
+    pub theme: String,  // system / light / dark
+    pub font: String,   // 自定义程序字体（空 = 默认）
     pub font_size: u16, // 基础字号 px（0 = 默认 13）
 }
 

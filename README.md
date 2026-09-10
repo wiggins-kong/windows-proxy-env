@@ -61,34 +61,11 @@ cp target/release/ProxyEnv.exe ../dist/ProxyEnv.exe
 | 环境变量 | `HKCU\Environment`（HTTP_PROXY / HTTPS_PROXY / ALL_PROXY / NO_PROXY） |
 | 自启动项 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\ProxyEnv` |
 
-## 开发进度
+## 项目文档
 
-### ✅ 已完成
-- [x] 需求澄清与方案（grill-me 流程，5 分支决策）
-- [x] Tauri v2 项目骨架（纯静态前端，无 vite）
-- [x] 注册表读写 + `WM_SETTINGCHANGE` 广播（winreg + windows-sys）
-- [x] 类型→变量映射、认证拼接、NO_PROXY 管理
-- [x] 配置持久化（`%APPDATA%\ProxyEnv\config.json`）
-- [x] 连通性测试（reqwest / rustls / socks）
-- [x] 托盘（左键开窗 / 右键菜单）与单实例保护
-- [x] 托盘状态图标（启用彩色+绿点 / 停用灰度+灰点，tooltip 与菜单联动）
-- [x] 配置已更改横幅（启用中改参数 → 应用更改无感重写）
-- [x] 自绘标题栏（拖拽 + 设置 / 最小化 / 关闭）
-- [x] Fluent 风格 UI 重设计：协议分段选择、主操作卡、4 行状态条、设置弹窗（Tab：常规 / 外观）
-- [x] 三态主题、字体 / 字号自定义（持久化）
-- [x] 开机自启开关
-
-### 🔧 修复记录（重要）
-- **托盘双图标**：`tauri.conf.json` 的 `trayIcon` 会自动创建默认托盘，与代码创建重复 → 只保留代码创建并显式指定图标
-- **标题栏点不动 / 拖不动**：`capabilities` 缺失导致核心窗口命令（`plugin:window|*`）被 ACL 拒绝 → 补 `capabilities/default.json`（`core:default` + 显式窗口权限）
-- **只改前端不生效**：内嵌资源仅在 Rust 重编译时更新 → 构建须 `touch src/main.rs`（见"构建"）；固化 `scripts/build.sh`
-- **设置按钮逻辑取反**：视图切换判断写反 → 修正为 `showView(contains("hidden"))`
-- **build.sh 资源校验中断**：系统 `python3` 缺 brotli 导致 `set -e` 中断、`cp dist` 未执行 → 自动探测 brotli 环境（回退 venv，均无则跳过校验继续）
-- 其他：modal 关闭按钮焦点环、标题栏 logo 与 exe 图标统一、停用图标清晰化、状态条分行、下拉箭头 SVG 化
-
-### 📋 后续候选
-- [ ] 代码签名（消除 SmartScreen 提示）
-- [ ] 图标微调 / 多语言
+- [changelog.md](changelog.md)：版本更新记录
+- [development.md](development.md)：开发进度、架构、构建与发布流程
+- [方案.md](方案.md)：初始产品与技术方案
 
 ## 许可证
 

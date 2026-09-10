@@ -1,8 +1,8 @@
 use serde::Serialize;
-use winreg::{enums::*, RegKey};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
 };
+use winreg::{enums::*, RegKey};
 
 pub const VARS: [&str; 4] = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
 
@@ -24,7 +24,9 @@ fn env_key() -> Result<RegKey, String> {
 }
 
 fn read_var(key: &RegKey, name: &str) -> Option<String> {
-    key.get_value::<String, _>(name).ok().filter(|v| !v.is_empty())
+    key.get_value::<String, _>(name)
+        .ok()
+        .filter(|v| !v.is_empty())
 }
 
 pub fn read_status() -> EnvStatus {
@@ -63,7 +65,10 @@ pub fn delete_var(name: &str) -> Result<(), String> {
 /// 广播环境变更通知，让新开的终端/资源管理器立即感知
 pub fn broadcast() {
     unsafe {
-        let name: Vec<u16> = "Environment".encode_utf16().chain(std::iter::once(0)).collect();
+        let name: Vec<u16> = "Environment"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let mut result: usize = 0;
         let _ = SendMessageTimeoutW(
             HWND_BROADCAST as _,
@@ -79,10 +84,7 @@ pub fn broadcast() {
 
 /// 一键清除所有代理相关环境变量
 pub fn clear_all() -> Result<(), String> {
-    let errors: Vec<String> = VARS
-        .iter()
-        .filter_map(|v| delete_var(v).err())
-        .collect();
+    let errors: Vec<String> = VARS.iter().filter_map(|v| delete_var(v).err()).collect();
     if !errors.is_empty() {
         return Err(errors.join("；"));
     }
