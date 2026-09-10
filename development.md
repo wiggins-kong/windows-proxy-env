@@ -4,7 +4,7 @@
 
 当前版本：`1.0.1`
 
-项目已经完成 Windows 便携版的核心功能和 GitHub Actions 发布链路。当前重点从功能开发转为发布稳定性、文档维护和后续签名支持。
+项目已经完成 Windows 便携版的核心功能和 GitHub Actions 发布链路，并完成圆角品牌 logo、应用图标和托盘图标的统一。当前重点仍是 HTTP(S) 与 SOCKS 双通道改造，以及发布稳定性和后续签名支持。
 
 ## 当前迭代：HTTP(S) 与 SOCKS 双通道 UI
 
@@ -47,13 +47,13 @@
 - [x] 配置已更改横幅与无感应用更改
 - [x] GitHub Actions 标签发布流程
 - [x] 项目文档、更新日志和开发说明
+- [x] 圆角应用 logo、标题栏 SVG 与全套平台图标
 
 ## 待办
 
 - [ ] 为发布产物增加代码签名，减少 SmartScreen 提示
 - [ ] 评估多语言支持
 - [ ] 增加自动化测试与发布产物校验
-- [ ] 根据反馈调整应用和托盘图标
 
 ## 架构
 
@@ -66,6 +66,8 @@
 | `src-tauri/src/autostart.rs` | `HKCU\Run` 开机自启 |
 | `src-tauri/src/test.rs` | 通过代理访问 `generate_204` 并测量延迟 |
 | `ui/` | 无构建步骤的原生前端界面 |
+| `make_icon.py` | 生成应用源图以及 Windows、Android、iOS 全套图标 |
+| `make_tray_icons.py` | 从应用源图生成启用与停用两态托盘图标 |
 
 ## 本地开发
 
@@ -113,6 +115,17 @@ Copy-Item .\target\release\proxyenv.exe ..\dist\ProxyEnv.exe -Force
 3. 执行 `npm install` 安装 Tauri CLI；Python 3、`brotli` 和 Pillow 仅在构建校验或重建图标时需要。
 4. 阅读本文件“当前迭代”和 `方案.md`，以当前提交中的 `demo/index.html` 作为 UI 基线继续开发。
 5. 修改正式代码前先执行一次 `git status`，确认没有未提交的本地改动。
+
+### 更新 Logo 与图标
+
+先运行应用图标脚本，再生成托盘状态图标：
+
+```powershell
+python make_icon.py
+python make_tray_icons.py
+```
+
+`make_icon.py` 会更新根目录 `app-icon.png`，并生成 `src-tauri/icons/` 下的 Tauri、Windows、Android 和 iOS 图标；`make_tray_icons.py` 会在此基础上更新 `tray-on.png` 与 `tray-off.png`。
 
 ## 发布流程
 

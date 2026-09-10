@@ -102,7 +102,12 @@ body { display: flex; flex-direction: column; }
   flex: 1;
   cursor: default;
 }
-.app-logo { color: var(--accent); }
+.app-logo {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+}
 .tb-right { display: flex; }
 .tb-btn {
   width: 44px;

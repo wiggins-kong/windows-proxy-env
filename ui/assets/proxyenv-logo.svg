@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">ProxyEnv logo</title>
+  <desc id="logo-desc">A rounded blue tile with two flowing paths routed through a central proxy node.</desc>
+  <defs>
+    <linearGradient id="proxyenv-bg" x1="64" y1="2" x2="64" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b57d0"/>
+      <stop offset="1" stop-color="#3c91ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="27.5" fill="url(#proxyenv-bg)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <path d="M30.2 51.7A36 36 0 0 1 97.8 51.7" stroke="#fff"/>
+    <path d="M92.9 53.5 100.1 57.8 102.8 49.9" stroke="#fff"/>
+    <path d="M97.8 76.3A36 36 0 0 1 30.2 76.3" stroke="#b8e2ff"/>
+    <path d="M35.1 74.5 28 70.2 25.2 78.1" stroke="#b8e2ff"/>
+  </g>
+  <circle cx="64" cy="64" r="6.9" fill="#fff"/>
+  <circle cx="64" cy="64" r="3.1" fill="#1f6fdc"/>
+</svg>
