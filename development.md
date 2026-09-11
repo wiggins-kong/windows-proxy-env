@@ -28,7 +28,7 @@
 - `proxy_rules.rs`：按通道生成变量（`routes_for` / `values_for`）、复用来源（`socks_source`）、写入前校验（`validate`）。
 - `test.rs` / `main.rs`：`test_channel(settings, channel)` 分通道测试；托盘「测试连通性」依次测试所有已启用通道并回推结果；托盘 tooltip 分列两通道地址。
 - `disable_proxy`：两个通道都关掉后点「应用更改」= 清变量 + 把 `enabled=false` 写回配置；主按钮「停用代理」（`clear_proxy`）只清变量、保留配置，方便一键重开。
-- 新 logo（概念 C「轨道路由」）：`ui/assets/proxyenv-logo.svg` 为设计源，`make_icon.py` 用同一套几何生成 `app-icon.png` 与 Windows/Android/iOS 全套图标，`make_tray_icons.py` 再派生两态托盘图标。
+- 新 logo（概念 C「轨道路由」）：`ui/assets/proxyenv-logo.svg` 为设计源；`make_icon.py` 用同一套几何出两套画法——细节版（≥64px：完整轨道/光点/玻璃球）与简化版（<64px 与托盘：加粗交叉轨道 + 实心核心），`make_tray_icons.py` 再按彩色/灰度派生两态托盘图标。
 - 窗口默认尺寸 1040×780，最小尺寸 1000×640（保证始终左右两栏）。
 
 下一步：

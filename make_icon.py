@@ -1,12 +1,17 @@
-"""生成 ProxyEnv 应用图标（1024x1024 PNG）。
+"""生成 ProxyEnv 图标。
 
 概念 C「轨道路由」：靛蓝对角渐变圆角底 + 顶部白色泛光 + 右下紫色补光，
 两条交叉轨道穿过中央玻璃代理核心，轨道端点光点示意双通道上流动的请求。
 几何与 ui/assets/proxyenv-logo.svg 一一对应（SVG viewBox 0 0 128 128）。
+
+两套画法：
+- 细节版（>= 64px）：完整的轨道/光点/玻璃球，用于 app-icon、大图标、商店与 iOS/Android 大尺寸。
+- 简化版（< 64px 与托盘）：同一造型去掉细碎元素——加粗的交叉轨道 + 实心白核心，避免小尺寸糊成一块。
 """
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
+import math
 
 SIZE = 1024
 SCALE = 2
@@ -15,6 +20,8 @@ ROOT = Path(__file__).resolve().parent
 UNIT = S / 128.0            # SVG 单位 → 画布像素
 BLUR = 6 * UNIT             # SVG stdDeviation=6
 CENTER = S / 2.0
+DETAIL_MIN = 64             # 小于该尺寸用简化版
+TRAY_SIZE = 64
 
 BG_STOPS = [
     (0.0, (0x4F, 0x8D, 0xFF)),
@@ -48,22 +55,23 @@ def diagonal_gradient(size):
     return small.resize((size, size), Image.Resampling.BICUBIC)
 
 
-def gradient_tile():
-    img = diagonal_gradient(S).convert("RGBA")
-    mask = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [u(4), u(4), u(121), u(121)],
-        radius=u(34),
-        fill=255,
-    )
-    img.putalpha(mask)
-    return img
-
-
-def glow_layer(box, color, opacity, blur):
-    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+def glow_layer(box, color, opacity, blur, size=S):
+    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     ImageDraw.Draw(layer).ellipse(box, fill=(*color, int(round(255 * opacity))))
     return layer.filter(ImageFilter.GaussianBlur(blur))
+
+
+def rounded_mask(size, radius):
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [size * 4 / 128, size * 4 / 128, size * 121 / 128, size * 121 / 128],
+        radius=radius,
+        fill=255,
+    )
+    return mask
+
+
+# ---------------------------------------------------------------- 细节版
 
 
 def orbit_layer(rx, ry, width, color, opacity, svg_angle):
@@ -101,69 +109,110 @@ def glass_core(radius, top_alpha, bottom_alpha):
     return out
 
 
-img = gradient_tile()
+def render_detail():
+    img = diagonal_gradient(S).convert("RGBA")
+    img.putalpha(rounded_mask(S, u(34)))
 
-# 泛光（会被圆角裁掉，模拟玻璃折射）
-img = Image.alpha_composite(img, glow_layer(
-    [CENTER - u(82), -u(6) - u(42), CENTER + u(82), -u(6) + u(42)],
-    (255, 255, 255), 0.16, BLUR))
-img = Image.alpha_composite(img, glow_layer(
-    [u(118) - u(56), u(120) - u(40), u(118) + u(56), u(120) + u(40)],
-    (0x8B, 0x5C, 0xF6), 0.40, BLUR))
+    img = Image.alpha_composite(img, glow_layer(
+        [CENTER - u(82), -u(6) - u(42), CENTER + u(82), -u(6) + u(42)],
+        (255, 255, 255), 0.16, BLUR))
+    img = Image.alpha_composite(img, glow_layer(
+        [u(118) - u(56), u(120) - u(40), u(118) + u(56), u(120) + u(40)],
+        (0x8B, 0x5C, 0xF6), 0.40, BLUR))
 
-# 两条交叉轨道
-img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (255, 255, 255), 0.85, 30))
-img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (0xA5, 0xF3, 0xFC), 0.85, -30))
+    img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (255, 255, 255), 0.85, 30))
+    img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (0xA5, 0xF3, 0xFC), 0.85, -30))
 
-draw = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(img)
 
+    def dot(svg_x, svg_y, radius, color, opacity=1.0):
+        cx, cy, r = u(svg_x), u(svg_y), u(radius)
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(*color, int(round(255 * opacity))))
 
-def dot(svg_x, svg_y, radius, color, opacity=1.0):
-    cx, cy, r = u(svg_x), u(svg_y), u(radius)
+    dot(96.9, 45.0, 5.0, (255, 255, 255))
+    dot(31.1, 83.0, 5.0, (0xA5, 0xF3, 0xFC))
+    dot(31.1, 45.0, 3.4, (255, 255, 255), 0.65)
+    dot(96.9, 83.0, 3.4, (0xA5, 0xF3, 0xFC), 0.65)
+
+    img = Image.alpha_composite(img, glow_layer(
+        [CENTER - u(19), CENTER - u(19), CENTER + u(19), CENTER + u(19)],
+        (255, 255, 255), 0.30, BLUR))
+    img = Image.alpha_composite(img, glass_core(15, 0.55, 0.10))
+
+    draw = ImageDraw.Draw(img)
+    core = u(15)
     draw.ellipse(
-        [cx - r, cy - r, cx + r, cy + r],
-        fill=(*color, int(round(255 * opacity))),
+        [CENTER - core, CENTER - core, CENTER + core, CENTER + core],
+        outline=(255, 255, 255, int(round(255 * 0.6))),
+        width=int(round(u(1.5))),
     )
+    dot(64.0, 64.0, 5.0, (255, 255, 255))
+
+    img.putalpha(Image.composite(img.getchannel("A"), Image.new("L", (S, S), 0), rounded_mask(S, u(34))))
+    return img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
 
-dot(96.9, 45.0, 5.0, (255, 255, 255))
-dot(31.1, 83.0, 5.0, (0xA5, 0xF3, 0xFC))
-dot(31.1, 45.0, 3.4, (255, 255, 255), 0.65)
-dot(96.9, 83.0, 3.4, (0xA5, 0xF3, 0xFC), 0.65)
+# ---------------------------------------------------------------- 简化版
 
-# 中央代理核心：外泛光 + 玻璃球 + 实心点
-img = Image.alpha_composite(img, glow_layer(
-    [CENTER - u(19), CENTER - u(19), CENTER + u(19), CENTER + u(19)],
-    (255, 255, 255), 0.30, BLUR))
-img = Image.alpha_composite(img, glass_core(15, 0.55, 0.10))
 
-draw = ImageDraw.Draw(img)
-core = u(15)
-draw.ellipse(
-    [CENTER - core, CENTER - core, CENTER + core, CENTER + core],
-    outline=(255, 255, 255, int(round(255 * 0.6))),
-    width=int(round(u(1.5))),
-)
-dot(64.0, 64.0, 5.0, (255, 255, 255))
+def render_small(size, supersample=4):
+    """小尺寸专用：同一造型，加粗轨道 + 实心白核心，去掉光点与玻璃渐变"""
+    s = size * supersample
+    unit = s / 128.0
+    center = s / 2.0
+    img = diagonal_gradient(s).convert("RGBA")
+    img.putalpha(rounded_mask(s, 34 * unit))
 
-# 回到圆角裁切 + 输出
-final_mask = Image.new("L", (S, S), 0)
-ImageDraw.Draw(final_mask).rounded_rectangle(
-    [u(4), u(4), u(121), u(121)],
-    radius=u(34),
-    fill=255,
-)
-img.putalpha(Image.composite(img.getchannel("A"), Image.new("L", (S, S), 0), final_mask))
+    img = Image.alpha_composite(img, glow_layer(
+        [center - 82 * unit, -6 * unit - 42 * unit, center + 82 * unit, -6 * unit + 42 * unit],
+        (255, 255, 255), 0.16, 6 * unit, size=s))
 
-img = img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+    draw = ImageDraw.Draw(img)
+    bar_half = 38 * unit
+    bar_width = int(round(13 * unit))
+    for svg_angle, color in ((30, (255, 255, 255)), (-30, (0xA5, 0xF3, 0xFC))):
+        a = math.radians(svg_angle)
+        dx, dy = bar_half * math.cos(a), bar_half * math.sin(a)
+        p1 = (center - dx, center - dy)
+        p2 = (center + dx, center + dy)
+        draw.line([p1, p2], fill=(*color, 255), width=bar_width)
+        for p in (p1, p2):
+            draw.ellipse(
+                [p[0] - bar_width / 2, p[1] - bar_width / 2, p[0] + bar_width / 2, p[1] + bar_width / 2],
+                fill=(*color, 255),
+            )
+
+    core_r = 13 * unit
+    draw.ellipse(
+        [center - core_r, center - core_r, center + core_r, center + core_r],
+        fill=(255, 255, 255, 255),
+    )
+    return img.resize((size, size), Image.Resampling.LANCZOS)
+
+
+# ---------------------------------------------------------------- 输出
+
+detail = render_detail()
+small = render_small(SIZE // 4)
 output = ROOT / "app-icon.png"
-img.save(output)
+detail.save(output)
+small_output = ROOT / "app-icon-small.png"
+small.save(small_output)
+
+detail_256 = detail.resize((256, 256), Image.Resampling.LANCZOS)
+
+
+def variant_for(size):
+    """小尺寸用简化版，大尺寸用细节版"""
+    if size < DETAIL_MIN:
+        return render_small(size)
+    return detail.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def save_png(relative_path, size):
     path = ROOT / "src-tauri" / "icons" / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    img.resize((size, size), Image.Resampling.LANCZOS).save(path)
+    variant_for(size).save(path)
 
 
 # Tauri / Windows / Store
@@ -186,12 +235,21 @@ for filename, size in {
 }.items():
     save_png(filename, size)
 
-img.save(
+# .ico：每个尺寸都放"刚好那么大"的那张图——小尺寸用简化版，不做跨尺寸缩放
+ico_sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+ico_extra = []
+for size in ico_sizes:
+    px = size[0]
+    if px == 256:
+        continue
+    ico_extra.append(variant_for(px))
+detail_256.save(
     ROOT / "src-tauri" / "icons" / "icon.ico",
     format="ICO",
-    sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    sizes=ico_sizes,
+    append_images=ico_extra,
 )
-img.save(ROOT / "src-tauri" / "icons" / "icon.icns", format="ICNS")
+detail.save(ROOT / "src-tauri" / "icons" / "icon.icns", format="ICNS")
 
 # Android
 for density, size in {
@@ -228,4 +286,6 @@ for filename, size in {
 }.items():
     save_png(f"ios/{filename}", size)
 
-print("icons saved", output, "and src-tauri/icons")
+print("detail:", output)
+print("small :", small_output)
+print("themes:", len(ico_sizes), "ico layers,", DETAIL_MIN, "px 以下用简化版")
