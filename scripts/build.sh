@@ -31,7 +31,8 @@ for fp in glob.glob(os.path.join(d, "*")):
         out = brotli.decompress(open(fp, "rb").read())
     except Exception:
         continue
-    if b"flexDirection" in out or b"modal-settings" in out or b"apply-banner" in out:
+    markers = (b"socksReuseHint", b"dirtyBanner", b"httpChannel")
+    if any(marker in out for marker in markers):
         print("OK 前端资源为最新版:", fp)
         sys.exit(0)
 print("WARN 未能从资源中定位最新特征（build 可能未含最新前端）")

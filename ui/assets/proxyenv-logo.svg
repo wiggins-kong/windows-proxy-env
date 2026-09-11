@@ -1,19 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="logo-title logo-desc">
   <title id="logo-title">ProxyEnv logo</title>
-  <desc id="logo-desc">A rounded blue tile with two flowing paths routed through a central proxy node.</desc>
+  <desc id="logo-desc">靛蓝渐变圆角底，两条交叉轨道穿过中央玻璃代理核心，轨道上的光点表示流动的请求。</desc>
   <defs>
-    <linearGradient id="proxyenv-bg" x1="64" y1="2" x2="64" y2="126" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0b57d0"/>
-      <stop offset="1" stop-color="#3c91ff"/>
+    <linearGradient id="proxyenv-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F8DFF"/>
+      <stop offset=".55" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#6D28D9"/>
     </linearGradient>
+    <linearGradient id="proxyenv-glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+    <filter id="proxyenv-blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <clipPath id="proxyenv-clip">
+      <rect x="4" y="4" width="120" height="120" rx="34"/>
+    </clipPath>
   </defs>
-  <rect x="2" y="2" width="124" height="124" rx="27.5" fill="url(#proxyenv-bg)"/>
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
-    <path d="M30.2 51.7A36 36 0 0 1 97.8 51.7" stroke="#fff"/>
-    <path d="M92.9 53.5 100.1 57.8 102.8 49.9" stroke="#fff"/>
-    <path d="M97.8 76.3A36 36 0 0 1 30.2 76.3" stroke="#b8e2ff"/>
-    <path d="M35.1 74.5 28 70.2 25.2 78.1" stroke="#b8e2ff"/>
+  <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#proxyenv-bg)"/>
+  <g clip-path="url(#proxyenv-clip)">
+    <ellipse cx="64" cy="-6" rx="82" ry="42" fill="#fff" opacity=".16" filter="url(#proxyenv-blur)"/>
+    <ellipse cx="118" cy="120" rx="56" ry="40" fill="#8B5CF6" opacity=".4" filter="url(#proxyenv-blur)"/>
   </g>
-  <circle cx="64" cy="64" r="6.9" fill="#fff"/>
-  <circle cx="64" cy="64" r="3.1" fill="#1f6fdc"/>
+  <g fill="none" stroke-width="5">
+    <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(30 64 64)" stroke="#fff" opacity=".85"/>
+    <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(-30 64 64)" stroke="#A5F3FC" opacity=".85"/>
+  </g>
+  <circle cx="96.9" cy="45" r="5" fill="#fff"/>
+  <circle cx="31.1" cy="83" r="5" fill="#A5F3FC"/>
+  <circle cx="31.1" cy="45" r="3.4" fill="#fff" opacity=".65"/>
+  <circle cx="96.9" cy="83" r="3.4" fill="#A5F3FC" opacity=".65"/>
+  <circle cx="64" cy="64" r="19" fill="#fff" opacity=".3" filter="url(#proxyenv-blur)"/>
+  <circle cx="64" cy="64" r="15" fill="url(#proxyenv-glass)" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+  <circle cx="64" cy="64" r="5" fill="#fff"/>
 </svg>

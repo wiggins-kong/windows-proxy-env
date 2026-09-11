@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ProxyEnv 圆角 Logo 重设计 · 渐变 + 毛玻璃 Demo</title>
+<style>
+  :root{
+    --bg:#0b1020; --card:#131a2e; --line:#232c4a;
+    --fg:#e8ecf8; --muted:#8b93ad; --accent:#5b8cff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;padding:36px 40px;max-width:1180px}
+  h1{font-size:22px;font-weight:700;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin:6px 0 28px}
+  h2{font-size:15px;font-weight:600;margin:34px 0 4px;color:var(--fg)}
+  .note{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+  .grid{display:flex;gap:22px;flex-wrap:wrap}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;flex:1 1 300px;min-width:300px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:2px}
+  .card .tag{font-size:11.5px;color:var(--accent);margin-bottom:10px;display:block}
+  .card p{font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:10px}
+  .stage{display:flex;justify-content:center;padding:14px 0 6px}
+  svg.tile{width:148px;height:148px;display:block;filter:drop-shadow(0 10px 24px rgba(0,0,0,.45))}
+  .strip{display:flex;gap:14px;align-items:flex-end;margin-top:14px;padding:14px;border-radius:12px;
+    background:linear-gradient(120deg,#1b2f6e,#5b2a9e 45%,#0e6e7e);}
+  .strip .cell{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .strip .cell.light{background:#f4f6fb;border-radius:10px;padding:10px 12px}
+  .strip .cell span{font-size:10.5px;color:#cbd3ea}
+  .strip .cell.light span{color:#5a6478}
+  .strip svg{display:block;filter:drop-shadow(0 3px 8px rgba(0,0,0,.35))}
+  .strip svg.mono{filter:grayscale(1) drop-shadow(0 3px 8px rgba(0,0,0,.35))}
+  .legend{display:flex;gap:18px;margin-top:26px;flex-wrap:wrap}
+  .legend div{font-size:12px;color:var(--muted)}
+  .legend b{color:var(--fg);font-weight:600}
+  .swatches{display:flex;gap:8px;margin-top:18px}
+  .sw{width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.15)}
+</style>
+</head>
+<body>
+
+<h1>ProxyEnv · 圆角 Logo 重设计</h1>
+<div class="sub">渐变 + 毛玻璃（Glassmorphism）方向 · 3 个概念 · 尺寸 / 明暗 / 灰度托盘适配测试</div>
+
+<!-- ===================== 概念 A ===================== -->
+<h2>概念 A · 双通道汇流</h2>
+<div class="note">HTTP(S) 与 SOCKS 两条通道交叉穿过中央代理节点 —— 保留现有「汇流」隐喻，升级为玻璃质感。白色通道 = HTTP，青色通道 = SOCKS。</div>
+<div class="grid">
+  <div class="card">
+    <h3>主方案</h3><span class="tag">蓝→靛→紫渐变底 + 玻璃节点</span>
+    <div class="stage">
+      <svg class="tile" viewBox="0 0 128 128" role="img" aria-label="ProxyEnv 概念A">
+        <defs>
+          <linearGradient id="a-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3B82F6"/><stop offset=".55" stop-color="#4F46E5"/><stop offset="1" stop-color="#7C3AED"/>
+          </linearGradient>
+          <linearGradient id="a-glass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/>
+          </linearGradient>
+          <filter id="a-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
+          <clipPath id="a-clip"><rect x="4" y="4" width="120" height="120" rx="34"/></clipPath>
+        </defs>
+        <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#a-bg)"/>
+        <g clip-path="url(#a-clip)">
+          <ellipse cx="60" cy="-8" rx="82" ry="44" fill="#fff" opacity=".16" filter="url(#a-blur)"/>
+          <ellipse cx="110" cy="122" rx="58" ry="40" fill="#22D3EE" opacity=".38" filter="url(#a-blur)"/>
+        </g>
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 48 C42 48 44 64 64 64 S86 80 108 80" stroke="#fff" stroke-width="9" opacity=".95"/>
+          <path d="M100 73 L108 80 L100 87" stroke="#fff" stroke-width="5.5"/>
+          <path d="M20 80 C42 80 44 64 64 64 S86 48 108 48" stroke="#A5F3FC" stroke-width="9" opacity=".9"/>
+          <path d="M100 41 L108 48 L100 55" stroke="#A5F3FC" stroke-width="5.5"/>
+        </g>
+        <circle cx="64" cy="64" r="21" fill="#fff" opacity=".35" filter="url(#a-blur)"/>
+        <circle cx="64" cy="64" r="16.5" fill="url(#a-glass)" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+        <circle cx="64" cy="64" r="5.5" fill="#fff"/>
+      </svg>
+    </div>
+    <p>双通道交叉 + 中央玻璃节点，箭头指示「写入环境变量、向外生效」的方向性。节点毛玻璃高光呼应 Win11 Fluent。</p>
+  </div>
+
+  <div class="card">
+    <h3>适配测试</h3><span class="tag">小尺寸 / 浅色底 / 托盘灰度</span>
+    <div class="strip">
+      <div class="cell"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#a-full"/></svg><span>48px</span></div>
+      <div class="cell"><svg width="24" height="24" viewBox="0 0 128 128"><use href="#a-full"/></svg><span>24px</span></div>
+      <div class="cell"><svg width="16" height="16" viewBox="0 0 128 128"><use href="#a-full"/></svg><span>16px</span></div>
+      <div class="cell light"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#a-full"/></svg><span>浅色底</span></div>
+      <div class="cell"><svg class="mono" width="48" height="48" viewBox="0 0 128 128"><use href="#a-full"/></svg><span>托盘灰度(停用)</span></div>
+    </div>
+    <p>16px 下双通道仍可辨；灰度版本对应托盘「停用」状态图标。</p>
+  </div>
+</div>
+
+<!-- ===================== 概念 B ===================== -->
+<h2>概念 B · 玻璃拨杆（开关隐喻）</h2>
+<div class="note">程序核心是「一键启用 / 停用」—— 毛玻璃滑轨 + 发光拨杆，ON 位绿色辉光直接对应托盘绿色角标。</div>
+<div class="grid">
+  <div class="card">
+    <h3>主方案</h3><span class="tag">靛蓝渐变底 + 玻璃滑轨</span>
+    <div class="stage">
+      <svg class="tile" viewBox="0 0 128 128" role="img" aria-label="ProxyEnv 概念B">
+        <defs>
+          <linearGradient id="b-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#4F8DFF"/><stop offset=".55" stop-color="#4F46E5"/><stop offset="1" stop-color="#6D28D9"/>
+          </linearGradient>
+          <linearGradient id="b-glass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+          </linearGradient>
+          <linearGradient id="b-knob" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#D7F5EE"/>
+          </linearGradient>
+          <filter id="b-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
+          <clipPath id="b-clip"><rect x="4" y="4" width="120" height="120" rx="34"/></clipPath>
+        </defs>
+        <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#b-bg)"/>
+        <g clip-path="url(#b-clip)">
+          <ellipse cx="60" cy="-8" rx="82" ry="44" fill="#fff" opacity=".16" filter="url(#b-blur)"/>
+          <ellipse cx="16" cy="124" rx="56" ry="38" fill="#8B5CF6" opacity=".4" filter="url(#b-blur)"/>
+        </g>
+        <rect x="22" y="47" width="84" height="34" rx="17" fill="url(#b-glass)" stroke="#fff" stroke-opacity=".5" stroke-width="1.5"/>
+        <rect x="26" y="50" width="76" height="13" rx="6.5" fill="#fff" opacity=".14"/>
+        <circle cx="88" cy="64" r="18" fill="#34D399" opacity=".55" filter="url(#b-blur)"/>
+        <circle cx="88" cy="64" r="13" fill="url(#b-knob)" stroke="#fff" stroke-opacity=".8" stroke-width="1"/>
+        <g stroke="#fff" stroke-opacity=".8" stroke-width="3" stroke-linecap="round">
+          <path d="M36 60 v8"/><path d="M45 58 v12"/><path d="M54 61 v6"/>
+        </g>
+      </svg>
+    </div>
+    <p>左侧三道短划线代表写入的环境变量（HTTP_PROXY / HTTPS_PROXY / ALL_PROXY），拨杆在 ON 位 + 绿色辉光 = 代理已启用。</p>
+  </div>
+
+  <div class="card">
+    <h3>适配测试</h3><span class="tag">小尺寸 / 浅色底 / 托盘灰度</span>
+    <div class="strip">
+      <div class="cell"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#b-full"/></svg><span>48px</span></div>
+      <div class="cell"><svg width="24" height="24" viewBox="0 0 128 128"><use href="#b-full"/></svg><span>24px</span></div>
+      <div class="cell"><svg width="16" height="16" viewBox="0 0 128 128"><use href="#b-full"/></svg><span>16px</span></div>
+      <div class="cell light"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#b-full"/></svg><span>浅色底</span></div>
+      <div class="cell"><svg class="mono" width="48" height="48" viewBox="0 0 128 128"><use href="#b-full"/></svg><span>托盘灰度(停用)</span></div>
+    </div>
+    <p>开关形态在小尺寸下辨识度最高，适合托盘 16–32px 场景。</p>
+  </div>
+</div>
+
+<!-- ===================== 概念 C ===================== -->
+<h2>概念 C · 轨道路由</h2>
+<div class="note">中央玻璃核心 + 双交叉轨道 = 请求被代理核心接管并转发；轨道上的光点如同流动的数据包。</div>
+<div class="grid">
+  <div class="card">
+    <h3>主方案</h3><span class="tag">靛蓝渐变底（同概念B）+ 玻璃核心</span>
+    <div class="stage">
+      <svg class="tile" viewBox="0 0 128 128" role="img" aria-label="ProxyEnv 概念C">
+        <defs>
+          <linearGradient id="c-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#4F8DFF"/><stop offset=".55" stop-color="#4F46E5"/><stop offset="1" stop-color="#6D28D9"/>
+          </linearGradient>
+          <linearGradient id="c-glass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+          </linearGradient>
+          <filter id="c-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
+          <clipPath id="c-clip"><rect x="4" y="4" width="120" height="120" rx="34"/></clipPath>
+        </defs>
+        <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#c-bg)"/>
+        <g clip-path="url(#c-clip)">
+          <ellipse cx="64" cy="-6" rx="82" ry="42" fill="#fff" opacity=".16" filter="url(#c-blur)"/>
+          <ellipse cx="118" cy="120" rx="56" ry="40" fill="#8B5CF6" opacity=".4" filter="url(#c-blur)"/>
+        </g>
+        <g fill="none" stroke-width="5">
+          <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(30 64 64)" stroke="#fff" opacity=".85"/>
+          <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(-30 64 64)" stroke="#A5F3FC" opacity=".85"/>
+        </g>
+        <circle cx="96.9" cy="45" r="5" fill="#fff"/>
+        <circle cx="31.1" cy="83" r="5" fill="#A5F3FC"/>
+        <circle cx="31.1" cy="45" r="3.4" fill="#fff" opacity=".65"/>
+        <circle cx="96.9" cy="83" r="3.4" fill="#A5F3FC" opacity=".65"/>
+        <circle cx="64" cy="64" r="19" fill="#fff" opacity=".3" filter="url(#c-blur)"/>
+        <circle cx="64" cy="64" r="15" fill="url(#c-glass)" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+        <circle cx="64" cy="64" r="5" fill="#fff"/>
+      </svg>
+    </div>
+    <p>轨道交叉造型独特、不依赖箭头；四颗光点示意双通道上流动的请求，中央玻璃球即代理核心。</p>
+  </div>
+
+  <div class="card">
+    <h3>适配测试</h3><span class="tag">小尺寸 / 浅色底 / 托盘灰度</span>
+    <div class="strip">
+      <div class="cell"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#c-full"/></svg><span>48px</span></div>
+      <div class="cell"><svg width="24" height="24" viewBox="0 0 128 128"><use href="#c-full"/></svg><span>24px</span></div>
+      <div class="cell"><svg width="16" height="16" viewBox="0 0 128 128"><use href="#c-full"/></svg><span>16px</span></div>
+      <div class="cell light"><svg width="48" height="48" viewBox="0 0 128 128"><use href="#c-full"/></svg><span>浅色底</span></div>
+      <div class="cell"><svg class="mono" width="48" height="48" viewBox="0 0 128 128"><use href="#c-full"/></svg><span>托盘灰度(停用)</span></div>
+    </div>
+    <p>交叉轨道在小尺寸下呈「X + 圆心」，结构清晰不糊。</p>
+  </div>
+</div>
+
+<div class="legend">
+  <div><b>设计语言</b>：34px 大圆角（匹配 Win11 应用圆角）· 顶部白色泛光 + 底部补色辉光模拟玻璃折射 · 半透明白描边勾边</div>
+</div>
+<div class="swatches">
+  <div class="sw" style="background:#3B82F6" title="#3B82F6"></div>
+  <div class="sw" style="background:#4F46E5" title="#4F46E5"></div>
+  <div class="sw" style="background:#7C3AED" title="#7C3AED"></div>
+  <div class="sw" style="background:#06B6D4" title="#06B6D4"></div>
+  <div class="sw" style="background:#34D399" title="#34D399"></div>
+  <div class="sw" style="background:#A5F3FC" title="#A5F3FC"></div>
+</div>
+
+<!-- 共享 defs：用 <use> 复用三个主方案做尺寸测试 -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="a-full">
+      <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#a-bg)"/>
+      <g clip-path="url(#a-clip)">
+        <ellipse cx="60" cy="-8" rx="82" ry="44" fill="#fff" opacity=".16" filter="url(#a-blur)"/>
+        <ellipse cx="110" cy="122" rx="58" ry="40" fill="#22D3EE" opacity=".38" filter="url(#a-blur)"/>
+      </g>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 48 C42 48 44 64 64 64 S86 80 108 80" stroke="#fff" stroke-width="9" opacity=".95"/>
+        <path d="M100 73 L108 80 L100 87" stroke="#fff" stroke-width="5.5"/>
+        <path d="M20 80 C42 80 44 64 64 64 S86 48 108 48" stroke="#A5F3FC" stroke-width="9" opacity=".9"/>
+        <path d="M100 41 L108 48 L100 55" stroke="#A5F3FC" stroke-width="5.5"/>
+      </g>
+      <circle cx="64" cy="64" r="21" fill="#fff" opacity=".35" filter="url(#a-blur)"/>
+      <circle cx="64" cy="64" r="16.5" fill="url(#a-glass)" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+      <circle cx="64" cy="64" r="5.5" fill="#fff"/>
+    </g>
+    <g id="b-full">
+      <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#b-bg)"/>
+      <g clip-path="url(#b-clip)">
+        <ellipse cx="60" cy="-8" rx="82" ry="44" fill="#fff" opacity=".16" filter="url(#b-blur)"/>
+        <ellipse cx="16" cy="124" rx="56" ry="38" fill="#8B5CF6" opacity=".4" filter="url(#b-blur)"/>
+      </g>
+      <rect x="22" y="47" width="84" height="34" rx="17" fill="url(#b-glass)" stroke="#fff" stroke-opacity=".5" stroke-width="1.5"/>
+      <rect x="26" y="50" width="76" height="13" rx="6.5" fill="#fff" opacity=".14"/>
+      <circle cx="88" cy="64" r="18" fill="#34D399" opacity=".55" filter="url(#b-blur)"/>
+      <circle cx="88" cy="64" r="13" fill="url(#b-knob)" stroke="#fff" stroke-opacity=".8" stroke-width="1"/>
+      <g stroke="#fff" stroke-opacity=".8" stroke-width="3" stroke-linecap="round">
+        <path d="M36 60 v8"/><path d="M45 58 v12"/><path d="M54 61 v6"/>
+      </g>
+    </g>
+    <g id="c-full">
+      <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#c-bg)"/>
+      <g clip-path="url(#c-clip)">
+        <ellipse cx="64" cy="-6" rx="82" ry="42" fill="#fff" opacity=".16" filter="url(#c-blur)"/>
+        <ellipse cx="118" cy="120" rx="56" ry="40" fill="#8B5CF6" opacity=".4" filter="url(#c-blur)"/>
+      </g>
+      <g fill="none" stroke-width="5">
+        <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(30 64 64)" stroke="#fff" opacity=".85"/>
+        <ellipse cx="64" cy="64" rx="38" ry="15" transform="rotate(-30 64 64)" stroke="#A5F3FC" opacity=".85"/>
+      </g>
+      <circle cx="96.9" cy="45" r="5" fill="#fff"/>
+      <circle cx="31.1" cy="83" r="5" fill="#A5F3FC"/>
+      <circle cx="31.1" cy="45" r="3.4" fill="#fff" opacity=".65"/>
+      <circle cx="96.9" cy="83" r="3.4" fill="#A5F3FC" opacity=".65"/>
+      <circle cx="64" cy="64" r="19" fill="#fff" opacity=".3" filter="url(#c-blur)"/>
+      <circle cx="64" cy="64" r="15" fill="url(#c-glass)" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+      <circle cx="64" cy="64" r="5" fill="#fff"/>
+    </g>
+  </defs>
+</svg>
+
+</body>
+</html>

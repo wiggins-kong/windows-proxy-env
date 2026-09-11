@@ -1,96 +1,159 @@
-"""生成 ProxyEnv 应用图标（1024x1024 PNG）：
-Win11 圆角蓝底 + 双向代理路径，强调流量经过代理后继续转发。
+"""生成 ProxyEnv 应用图标（1024x1024 PNG）。
+
+概念 C「轨道路由」：靛蓝对角渐变圆角底 + 顶部白色泛光 + 右下紫色补光，
+两条交叉轨道穿过中央玻璃代理核心，轨道端点光点示意双通道上流动的请求。
+几何与 ui/assets/proxyenv-logo.svg 一一对应（SVG viewBox 0 0 128 128）。
 """
-import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 SIZE = 1024
 SCALE = 2
 S = SIZE * SCALE
 ROOT = Path(__file__).resolve().parent
+UNIT = S / 128.0            # SVG 单位 → 画布像素
+BLUR = 6 * UNIT             # SVG stdDeviation=6
+CENTER = S / 2.0
+
+BG_STOPS = [
+    (0.0, (0x4F, 0x8D, 0xFF)),
+    (0.55, (0x4F, 0x46, 0xE5)),
+    (1.0, (0x6D, 0x28, 0xD9)),
+]
+
+
+def u(value):
+    return value * UNIT
+
+
+def color_at(t):
+    """对角渐变取色：t=0 左上 → 1 右下"""
+    for i in range(len(BG_STOPS) - 1):
+        a, ca = BG_STOPS[i]
+        b, cb = BG_STOPS[i + 1]
+        if a <= t <= b:
+            k = 0.0 if b == a else (t - a) / (b - a)
+            return tuple(int(ca[j] + (cb[j] - ca[j]) * k) for j in range(3))
+    return BG_STOPS[-1][1]
+
+
+def diagonal_gradient(size):
+    """先画小尺寸再做双三次放大，避免逐像素扫描整个画布"""
+    small = Image.new("RGB", (256, 256))
+    pixels = small.load()
+    for y in range(256):
+        for x in range(256):
+            pixels[x, y] = color_at((x + y) / 510.0)
+    return small.resize((size, size), Image.Resampling.BICUBIC)
 
 
 def gradient_tile():
-    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    top = (11, 87, 208)      # #0B57D0
-    bottom = (60, 145, 255)  # #3C91FF
-
-    for y in range(16 * SCALE, S - 16 * SCALE):
-        t = (y - 16 * SCALE) / (S - 32 * SCALE)
-        color = tuple(
-            int(top[i] + (bottom[i] - top[i]) * t)
-            for i in range(3)
-        )
-        draw.line([(16 * SCALE, y), (S - 16 * SCALE, y)], fill=(*color, 255))
-
+    img = diagonal_gradient(S).convert("RGBA")
     mask = Image.new("L", (S, S), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
-        [16 * SCALE, 16 * SCALE, S - 16 * SCALE, S - 16 * SCALE],
-        radius=220 * SCALE,
+        [u(4), u(4), u(121), u(121)],
+        radius=u(34),
         fill=255,
     )
     img.putalpha(mask)
     return img
 
 
-def draw_arrow_arc(draw, start, end, color, width):
-    cx = cy = S // 2
-    radius = 288 * SCALE
-    line_width = width * SCALE
-    bbox = [cx - radius, cy - radius, cx + radius, cy + radius]
-    draw.arc(bbox, start=start, end=end, fill=color, width=line_width)
+def glow_layer(box, color, opacity, blur):
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).ellipse(box, fill=(*color, int(round(255 * opacity))))
+    return layer.filter(ImageFilter.GaussianBlur(blur))
 
-    end_rad = math.radians(end)
-    ex = cx + radius * math.cos(end_rad)
-    ey = cy + radius * math.sin(end_rad)
-    tangent = (-math.sin(end_rad), math.cos(end_rad))
-    normal = (-tangent[1], tangent[0])
 
-    cap_radius = line_width / 2
-    draw.ellipse(
-        [ex - cap_radius, ey - cap_radius, ex + cap_radius, ey + cap_radius],
-        fill=color,
+def orbit_layer(rx, ry, width, color, opacity, svg_angle):
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).ellipse(
+        [CENTER - u(rx), CENTER - u(ry), CENTER + u(rx), CENTER + u(ry)],
+        outline=(*color, int(round(255 * opacity))),
+        width=int(round(u(width))),
     )
+    # SVG 正角度为屏幕顺时针，PIL 正角度为逆时针 → 取负号
+    return layer.rotate(-svg_angle, resample=Image.Resampling.BICUBIC, center=(CENTER, CENTER))
 
-    tip_len = 52 * SCALE
-    wing = 42 * SCALE
-    tip = (ex + tangent[0] * tip_len, ey + tangent[1] * tip_len)
-    wing_a = (ex + normal[0] * wing, ey + normal[1] * wing)
-    wing_b = (ex - normal[0] * wing, ey - normal[1] * wing)
-    draw.line([wing_a, tip, wing_b], fill=color, width=line_width, joint="curve")
-    for point in (wing_a, wing_b):
-        draw.ellipse(
-            [
-                point[0] - cap_radius,
-                point[1] - cap_radius,
-                point[0] + cap_radius,
-                point[1] + cap_radius,
-            ],
-            fill=color,
-        )
+
+def glass_core(radius, top_alpha, bottom_alpha):
+    """半透明白球体：垂直方向 55% → 10% 的白色渐变，做出玻璃质感"""
+    box = [int(CENTER - u(radius)), int(CENTER - u(radius)), int(CENTER + u(radius)), int(CENTER + u(radius))]
+    w = box[2] - box[0]
+    h = box[3] - box[1]
+
+    alpha = Image.new("L", (1, h))
+    for y in range(h):
+        k = y / max(1, h - 1)
+        alpha.putpixel((0, y), int(round(255 * (top_alpha + (bottom_alpha - top_alpha) * k))))
+    alpha = alpha.resize((w, h), Image.Resampling.BICUBIC)
+
+    circle = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(circle).ellipse([0, 0, w - 1, h - 1], fill=255)
+    alpha = Image.composite(alpha, Image.new("L", (w, h), 0), circle)
+
+    ball = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+    ball.putalpha(alpha)
+
+    out = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    out.paste(ball, (box[0], box[1]))
+    return out
 
 
 img = gradient_tile()
+
+# 泛光（会被圆角裁掉，模拟玻璃折射）
+img = Image.alpha_composite(img, glow_layer(
+    [CENTER - u(82), -u(6) - u(42), CENTER + u(82), -u(6) + u(42)],
+    (255, 255, 255), 0.16, BLUR))
+img = Image.alpha_composite(img, glow_layer(
+    [u(118) - u(56), u(120) - u(40), u(118) + u(56), u(120) + u(40)],
+    (0x8B, 0x5C, 0xF6), 0.40, BLUR))
+
+# 两条交叉轨道
+img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (255, 255, 255), 0.85, 30))
+img = Image.alpha_composite(img, orbit_layer(38, 15, 5, (0xA5, 0xF3, 0xFC), 0.85, -30))
+
 draw = ImageDraw.Draw(img)
 
-# 上半路径：向左上流入，经顶部转发至右上。
-draw_arrow_arc(draw, 200, 340, (255, 255, 255, 255), 64)
-# 下半路径：向右下流入，经底部转发至左下。
-draw_arrow_arc(draw, 20, 160, (184, 226, 255, 255), 64)
 
-# 中心节点保持留白，让两条流线在 16px 下仍各自清晰。
-cx = cy = S // 2
+def dot(svg_x, svg_y, radius, color, opacity=1.0):
+    cx, cy, r = u(svg_x), u(svg_y), u(radius)
+    draw.ellipse(
+        [cx - r, cy - r, cx + r, cy + r],
+        fill=(*color, int(round(255 * opacity))),
+    )
+
+
+dot(96.9, 45.0, 5.0, (255, 255, 255))
+dot(31.1, 83.0, 5.0, (0xA5, 0xF3, 0xFC))
+dot(31.1, 45.0, 3.4, (255, 255, 255), 0.65)
+dot(96.9, 83.0, 3.4, (0xA5, 0xF3, 0xFC), 0.65)
+
+# 中央代理核心：外泛光 + 玻璃球 + 实心点
+img = Image.alpha_composite(img, glow_layer(
+    [CENTER - u(19), CENTER - u(19), CENTER + u(19), CENTER + u(19)],
+    (255, 255, 255), 0.30, BLUR))
+img = Image.alpha_composite(img, glass_core(15, 0.55, 0.10))
+
+draw = ImageDraw.Draw(img)
+core = u(15)
 draw.ellipse(
-    [cx - 55 * SCALE, cy - 55 * SCALE, cx + 55 * SCALE, cy + 55 * SCALE],
-    fill=(255, 255, 255, 255),
+    [CENTER - core, CENTER - core, CENTER + core, CENTER + core],
+    outline=(255, 255, 255, int(round(255 * 0.6))),
+    width=int(round(u(1.5))),
 )
-draw.ellipse(
-    [cx - 25 * SCALE, cy - 25 * SCALE, cx + 25 * SCALE, cy + 25 * SCALE],
-    fill=(31, 111, 220, 255),
+dot(64.0, 64.0, 5.0, (255, 255, 255))
+
+# 回到圆角裁切 + 输出
+final_mask = Image.new("L", (S, S), 0)
+ImageDraw.Draw(final_mask).rounded_rectangle(
+    [u(4), u(4), u(121), u(121)],
+    radius=u(34),
+    fill=255,
 )
+img.putalpha(Image.composite(img.getchannel("A"), Image.new("L", (S, S), 0), final_mask))
 
 img = img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 output = ROOT / "app-icon.png"

@@ -6,9 +6,9 @@
 
 项目已经完成 Windows 便携版的核心功能和 GitHub Actions 发布链路，并完成圆角品牌 logo、应用图标和托盘图标的统一。当前重点仍是 HTTP(S) 与 SOCKS 双通道改造，以及发布稳定性和后续签名支持。
 
-## 当前迭代：HTTP(S) 与 SOCKS 双通道 UI
+## 当前迭代：HTTP(S) 与 SOCKS 双通道
 
-状态：交互方案已确认，静态 HTML Demo 已完成；正式 `ui/` 和 Rust 后端尚未改造。
+状态：双通道改造已落地（UI 来自 `demo/two-column.html`，后端在 `src-tauri/`），logo 换成概念 C「轨道路由」，当前进入收尾验证阶段。
 
 目标行为：
 
@@ -21,18 +21,22 @@
 - UI 需明确说明 `HTTP_PROXY` / `HTTPS_PROXY` 优先，`ALL_PROXY` 是兜底，二者不是串联关系。
 - 连通性测试分别显示 HTTP(S) 和 SOCKS 两条通道的结果。
 
-当前交付物：
+已落地：
 
-- `demo/index.html`：可直接用浏览器打开的单文件交互 Demo，不会实际修改环境变量。
-- Demo 已覆盖独立开关、SOCKS5/SOCKS5h 切换、地址复用、实时变量预览、高级模式、双通道测试和响应式布局。
+- `ui/`：左右分栏界面，左侧通道配置（独立开关、SOCKS5/SOCKS5h、地址复用、共用 NO_PROXY、高级模式折叠），右侧「将写入的变量 / 应用配置 / 当前用户环境变量」。
+- `config.rs`：`Channel`（enabled/host/port/username/password）、`socks_scheme`、`socks_reuse_http`；旧版单通道 `config.json` 读取时自动迁移。
+- `proxy_rules.rs`：按通道生成变量（`routes_for` / `values_for`）、复用来源（`socks_source`）、写入前校验（`validate`）。
+- `test.rs` / `main.rs`：`test_channel(settings, channel)` 分通道测试；托盘「测试连通性」依次测试所有已启用通道并回推结果；托盘 tooltip 分列两通道地址。
+- `disable_proxy`：两个通道都关掉后点「应用更改」= 清变量 + 把 `enabled=false` 写回配置；主按钮「停用代理」（`clear_proxy`）只清变量、保留配置，方便一键重开。
+- 新 logo（概念 C「轨道路由」）：`ui/assets/proxyenv-logo.svg` 为设计源，`make_icon.py` 用同一套几何生成 `app-icon.png` 与 Windows/Android/iOS 全套图标，`make_tray_icons.py` 再派生两态托盘图标。
+- 窗口默认尺寸 1040×780，最小尺寸 1000×640（保证始终左右两栏）。
 
 下一步：
 
-1. 确认并冻结 Demo 的交互与视觉方案。
-2. 调整配置模型，持久化两套独立代理配置及启用状态。
-3. 调整 `proxy_rules.rs` 和 `env_util.rs` 的变量构建、写入与清除逻辑。
-4. 将确认后的 UI 合并进正式 `ui/`，移除只允许单协议生效的逻辑。
-5. 补充双通道组合、SOCKS5h、复用地址和高级模式覆盖的手动验证。
+1. 试用后确认并冻结交互与视觉细节。
+2. 手动验证组合：仅 HTTP(S)、仅 SOCKS、两者同时、SOCKS5h、复用开关、高级模式覆盖、清除与停用。
+3. 确认 SOCKS4 / SOCKS4a 是否彻底下线（新 UI 只保留 SOCKS5 / SOCKS5h）。
+4. 补充代码签名与自动化测试。
 
 ## 已完成
 
@@ -43,11 +47,11 @@
 - [x] 配置持久化到 `%APPDATA%\ProxyEnv\config.json`
 - [x] 代理连通性测试和延迟展示
 - [x] 托盘常驻、状态图标、菜单联动和单实例保护
-- [x] 开机自启、三态主题、字体和字号设置
+- [x] 开机自启、静默启动、主题跟随系统、字号设置
 - [x] 配置已更改横幅与无感应用更改
 - [x] GitHub Actions 标签发布流程
 - [x] 项目文档、更新日志和开发说明
-- [x] 圆角应用 logo、标题栏 SVG 与全套平台图标
+- [x] 圆角应用 logo、标题栏 SVG 与全套平台图标（概念 C「轨道路由」，标题栏/任务栏/托盘同一几何）
 
 ## 待办
 
@@ -61,8 +65,8 @@
 | --- | --- |
 | `src-tauri/src/main.rs` | Tauri 初始化、命令注册、托盘与窗口生命周期 |
 | `src-tauri/src/env_util.rs` | `HKCU\Environment` 读写、状态读取和系统广播 |
-| `src-tauri/src/proxy_rules.rs` | 代理类型到环境变量的映射与 URL 构建 |
-| `src-tauri/src/config.rs` | 用户配置模型和持久化 |
+| `src-tauri/src/proxy_rules.rs` | 通道到环境变量的映射、URL 构建与写入前校验 |
+| `src-tauri/src/config.rs` | 用户配置模型（双通道 + 外观启动项）和持久化 |
 | `src-tauri/src/autostart.rs` | `HKCU\Run` 开机自启 |
 | `src-tauri/src/test.rs` | 通过代理访问 `generate_204` 并测量延迟 |
 | `ui/` | 无构建步骤的原生前端界面 |
@@ -113,7 +117,7 @@ Copy-Item .\target\release\proxyenv.exe ..\dist\ProxyEnv.exe -Force
 1. 安装 Git、Rust stable MSVC、Node.js 和 WebView2。
 2. 克隆仓库 `https://github.com/wiggins-kong/windows-proxy-env.git`。
 3. 执行 `npm install` 安装 Tauri CLI；Python 3、`brotli` 和 Pillow 仅在构建校验或重建图标时需要。
-4. 阅读本文件“当前迭代”和 `方案.md`，以当前提交中的 `demo/index.html` 作为 UI 基线继续开发。
+4. 阅读本文件“当前迭代”和 `方案.md`，以当前提交中的 `demo/two-column.html` 作为 UI 基线继续开发。
 5. 修改正式代码前先执行一次 `git status`，确认没有未提交的本地改动。
 
 ### 更新 Logo 与图标
@@ -126,6 +130,8 @@ python make_tray_icons.py
 ```
 
 `make_icon.py` 会更新根目录 `app-icon.png`，并生成 `src-tauri/icons/` 下的 Tauri、Windows、Android 和 iOS 图标；`make_tray_icons.py` 会在此基础上更新 `tray-on.png` 与 `tray-off.png`。
+
+设计源是 `ui/assets/proxyenv-logo.svg`：改 logo 时先改这个 SVG，再按同样的几何更新 `make_icon.py`（脚本按 SVG 的 128 视图框逐项对应，乘 `UNIT = S/128`），否则标题栏和任务栏图标会不一致。
 
 ## 发布流程
 

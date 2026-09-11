@@ -17,11 +17,15 @@ pub fn is_enabled() -> bool {
 }
 
 /// 写当前 exe 到开机自启，禁用时移除
-pub fn set_enabled(enabled: bool) -> Result<(), String> {
+pub fn set_enabled(enabled: bool, silent_startup: bool) -> Result<(), String> {
     let key = run_key()?;
     if enabled {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let cmd = format!("\"{}\"", exe.display());
+        let cmd = if silent_startup {
+            format!("\"{}\" --silent", exe.display())
+        } else {
+            format!("\"{}\"", exe.display())
+        };
         key.set_value(APP_NAME, &cmd).map_err(|e| e.to_string())
     } else {
         match key.delete_value(APP_NAME) {

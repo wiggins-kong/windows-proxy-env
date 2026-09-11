@@ -35,14 +35,22 @@ fn sync_tray(app: &AppHandle) {
     if env.active {
         let icon = Image::from_bytes(include_bytes!("../icons/tray-on.png")).ok();
         let _ = st.tray.set_icon(icon);
-        let url = env
-            .all_proxy
-            .as_deref()
-            .or(env.http_proxy.as_deref())
-            .unwrap_or("");
+        // 双通道：HTTP(S) 与 SOCKS 分别列出当前地址
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(u) = env.http_proxy.as_deref() {
+            parts.push(format!("HTTP(S) {u}"));
+        }
+        if let Some(u) = env.all_proxy.as_deref() {
+            parts.push(format!("SOCKS {u}"));
+        }
+        let detail = if parts.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", parts.join(" · "))
+        };
         let _ = st
             .tray
-            .set_tooltip(Some(format!("ProxyEnv · 代理已启用 {url}")));
+            .set_tooltip(Some(format!("ProxyEnv · 代理已启用{detail}")));
         let _ = st.enable.set_enabled(false);
         let _ = st.disable.set_enabled(true);
     } else {
@@ -57,10 +65,8 @@ fn sync_tray(app: &AppHandle) {
 }
 
 fn apply_impl(settings: &Settings) -> Result<(), String> {
-    if !settings.use_advanced && settings.host.trim().is_empty() {
-        return Err("请先填写代理地址和端口".into());
-    }
-    // 先清干净，避免切换类型后残留旧变量
+    proxy_rules::validate(settings)?;
+    // 先清干净，避免切换通道后残留旧变量
     env_util::clear_all()?;
     for (name, val) in proxy_rules::values_for(settings) {
         env_util::write_var(&name, &val)?;
@@ -96,13 +102,43 @@ fn clear_proxy(app: AppHandle) -> Result<Snapshot, String> {
     })
 }
 
+/// 两个通道都关掉时的"停用"：清掉环境变量，并把 enabled=false 写回配置，
+/// 避免重启后出现"开关是开的、变量是空的"错位。
+#[tauri::command]
+fn disable_proxy(app: AppHandle) -> Result<Snapshot, String> {
+    env_util::clear_all()?;
+    let mut s = config::load();
+    s.http.enabled = false;
+    s.socks.enabled = false;
+    config::save(&s)?;
+    sync_tray(&app);
+    Ok(Snapshot {
+        settings: s,
+        env: env_util::read_status(),
+    })
+}
+
 #[tauri::command]
 fn set_autostart(enabled: bool) -> Result<bool, String> {
-    autostart::set_enabled(enabled)?;
     let mut s = config::load();
+    autostart::set_enabled(enabled, s.silent_startup)?;
     s.autostart = enabled;
+    if !enabled {
+        s.silent_startup = false;
+    }
     config::save(&s)?;
     Ok(autostart::is_enabled())
+}
+
+#[tauri::command]
+fn set_silent_startup(enabled: bool) -> Result<bool, String> {
+    let mut s = config::load();
+    if s.autostart {
+        autostart::set_enabled(true, enabled)?;
+    }
+    s.silent_startup = enabled;
+    config::save(&s)?;
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -122,16 +158,15 @@ fn set_theme(app: AppHandle, theme: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_font(font: String, font_size: u16) -> Result<(), String> {
+fn set_font(font_size: u16) -> Result<(), String> {
     let mut s = config::load();
-    s.font = font;
     s.font_size = font_size;
     config::save(&s)
 }
 
 #[tauri::command]
-async fn test_proxy(settings: Settings) -> TestResult {
-    test::run(&settings).await
+async fn test_channel(settings: Settings, channel: String) -> TestResult {
+    test::run(&settings, &channel).await
 }
 
 fn show_main(app: &AppHandle) {
@@ -168,8 +203,8 @@ fn handle_tray_menu(app: &AppHandle, id: &str) {
             let s = config::load();
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
-                let r = test::run(&s).await;
-                let _ = app.emit("proxyenv://tray-test-result", r);
+                let results = test::run_enabled(&s).await;
+                let _ = app.emit("proxyenv://tray-test-result", results);
             });
         }
         "quit" => {
@@ -180,6 +215,7 @@ fn handle_tray_menu(app: &AppHandle, id: &str) {
 }
 
 fn main() {
+    let silent_startup = std::env::args().any(|arg| arg == "--silent");
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main(app);
@@ -188,15 +224,19 @@ fn main() {
             get_state,
             apply_proxy,
             clear_proxy,
+            disable_proxy,
             set_autostart,
+            set_silent_startup,
             set_theme,
             set_font,
-            test_proxy
+            test_channel
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // Mica 效果由 tauri.conf.json 的 windowEffects 配置驱动（Win11 生效，Win10 自动降级）
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.show();
+            if !silent_startup {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.show();
+                }
             }
 
             // 托盘（menu 项与 tray 句柄托管进 state，供 sync_tray 运行时切换）

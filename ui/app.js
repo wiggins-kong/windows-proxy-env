@@ -1,582 +1,1125 @@
-/* ProxyEnv 前端逻辑 */
+/* ProxyEnv 前端逻辑 · HTTP(S) / SOCKS 双通道 */
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 const { listen } = window.__TAURI__.event;
 
-/* 错误面罩：任何 JS 错误/未捕获 Promise 异常都显示到状态徽标，便于快速定位 */
+/* 错误面罩：任何 JS 错误都显示到状态徽标，便于快速定位 */
 window.addEventListener("error", (e) => {
-  const b = document.getElementById("state-badge");
-  if (b) b.textContent = "JS错误:" + String(e.message || e).slice(0, 28);
+  const badge = document.getElementById("statusBadge");
+  if (badge) badge.textContent = "JS错误:" + String(e.message || e).slice(0, 24);
 });
 window.addEventListener("unhandledrejection", (e) => {
-  const b = document.getElementById("state-badge");
-  if (b) b.textContent = "JS异常:" + String(e.reason || "").slice(0, 28);
+  const badge = document.getElementById("statusBadge");
+  if (badge) badge.textContent = "JS异常:" + String(e.reason || "").slice(0, 24);
 });
 
 let win = null;
 try {
   win = getCurrentWindow();
 } catch (e) {
-  const b = document.getElementById("state-badge");
-  if (b) b.textContent = "API失败:" + String(e).slice(0, 28);
+  const badge = document.getElementById("statusBadge");
+  if (badge) badge.textContent = "API失败:" + String(e).slice(0, 24);
 }
 
 const $ = (id) => document.getElementById(id);
-const els = {
-  badge: $("state-badge"),
-  protoSeg: $("proto-seg"),
-  protoHint: $("proto-hint"),
-  host: $("host"),
-  port: $("port"),
-  username: $("username"),
-  password: $("password"),
-  noProxy: $("no-proxy"),
-  advToggle: $("adv-toggle"),
-  advBody: $("adv-body"),
-  advChevron: $("adv-chevron"),
-  useAdvanced: $("use-advanced"),
-  advHttp: $("adv-http"),
-  advHttps: $("adv-https"),
-  advAll: $("adv-all"),
-  advNoProxy: $("adv-noproxy"),
-  master: $("btn-master"),
-  masterText: $("master-text"),
-  testBtn: $("btn-test"),
-  clearBtn: $("btn-clear"),
-  testResult: $("test-result"),
-  stateStrip: $("state-strip"),
-  applyBanner: $("apply-banner"),
-  btnApply: $("btn-apply"),
-  autostart: $("autostart"),
-  themeSeg: $("theme-seg"),
-  toast: $("toast"),
+const qsa = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
+const root = document.documentElement;
+const mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+const DEFAULT_NO_PROXY = "localhost,127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
+const DEFAULT_FONT_SIZE = 14;
+
+const elements = {
   // 标题栏
-  btnSettings: $("btn-settings"),
-  btnMin: $("btn-min"),
-  btnClose: $("btn-close"),
-  // 设置弹窗
-  modal: $("modal-settings"),
-  modalClose: $("modal-close"),
-  modalTabs: document.querySelectorAll(".modal-tabs .seg"),
-  fontSelect: $("font-select"),
-  fontSize: $("font-size"),
-  sizeVal: $("size-val"),
+  dragRegion: $("dragRegion"),
+  btnMin: $("btnMin"),
+  btnClose: $("btnClose"),
+  // 设置
+  settingsButton: $("settingsButton"),
+  settingsModal: $("settingsModal"),
+  settingsClose: $("settingsClose"),
+  autostartToggle: $("autostartToggle"),
+  autostartLabel: $("autostartLabel"),
+  silentStartupRow: $("silentStartupRow"),
+  silentStartupToggle: $("silentStartupToggle"),
+  silentStartupLabel: $("silentStartupLabel"),
+  fontSize: $("fontSize"),
+  sizeVal: $("sizeVal"),
+  // 页面
+  statusBadge: $("statusBadge"),
+  dirtyBanner: $("dirtyBanner"),
+  bannerApplyButton: $("bannerApplyButton"),
+  httpChannel: $("httpChannel"),
+  httpToggle: $("httpToggle"),
+  httpSwitchLabel: $("httpSwitchLabel"),
+  httpBody: $("httpBody"),
+  httpHost: $("httpHost"),
+  httpPort: $("httpPort"),
+  httpUser: $("httpUser"),
+  httpPassword: $("httpPassword"),
+  httpHostError: $("httpHostError"),
+  httpPortError: $("httpPortError"),
+  httpAuthError: $("httpAuthError"),
+  socksChannel: $("socksChannel"),
+  socksToggle: $("socksToggle"),
+  socksSwitchLabel: $("socksSwitchLabel"),
+  socksBody: $("socksBody"),
+  socksVariant: $("socksVariant"),
+  socksHint: $("socksHint"),
+  socksReuse: $("socksReuse"),
+  socksReuseHint: $("socksReuseHint"),
+  socksHost: $("socksHost"),
+  socksPort: $("socksPort"),
+  socksUser: $("socksUser"),
+  socksPassword: $("socksPassword"),
+  socksHostError: $("socksHostError"),
+  socksPortError: $("socksPortError"),
+  socksAuthError: $("socksAuthError"),
+  noProxy: $("noProxy"),
+  previewList: $("previewList"),
+  previewSummaryText: $("previewSummaryText"),
+  previewMode: $("previewMode"),
+  advancedCard: $("advancedCard"),
+  advancedToggle: $("advancedToggle"),
+  advancedSwitchLabel: $("advancedSwitchLabel"),
+  advHttp: $("advHttp"),
+  advHttps: $("advHttps"),
+  advAll: $("advAll"),
+  advNoProxy: $("advNoProxy"),
+  advHttpError: $("advHttpError"),
+  advHttpsError: $("advHttpsError"),
+  advAllError: $("advAllError"),
+  actionSummary: $("actionSummary"),
+  clearButton: $("clearButton"),
+  testButton: $("testButton"),
+  masterButton: $("masterButton"),
+  testPanel: $("testPanel"),
+  httpResult: $("httpResult"),
+  socksResult: $("socksResult"),
+  envList: $("envList"),
+  toast: $("toast"),
 };
 
-let state = null;
-let toastTimer = null;
+const state = {
+  httpEnabled: false,
+  socksEnabled: false,
+  socksScheme: "socks5h",
+  socksReuseHttp: true,
+  advancedEnabled: false,
+  envActive: false,
+  envVars: {},
+  testing: false,
+  busy: false,
+  autostart: false,
+  silentStartup: false,
+  fontSize: 0,
+};
 
-/* ---------- 工具 ---------- */
-function toast(msg, isErr = false) {
-  els.toast.textContent = msg;
-  els.toast.classList.toggle("err", isErr);
-  els.toast.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 3000);
+const variableOrder = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
+const variableMeta = {
+  HTTP_PROXY: { tag: "优先", detail: "HTTP 请求" },
+  HTTPS_PROXY: { tag: "优先", detail: "HTTPS 请求" },
+  ALL_PROXY: { tag: "兜底", detail: "其他协议" },
+  NO_PROXY: { tag: "豁免", detail: "不走代理" },
+};
+
+let toastTimer = 0;
+let lastFocusedElement = null;
+
+/* ---------- 基础工具 ---------- */
+function showToast(message, isError = false) {
+  window.clearTimeout(toastTimer);
+  elements.toast.textContent = message;
+  elements.toast.classList.toggle("error", isError);
+  elements.toast.classList.add("show");
+  toastTimer = window.setTimeout(() => elements.toast.classList.remove("show"), 3200);
 }
-
-function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-  );
-}
-
-/* ---------- 主题 ---------- */
-const media = window.matchMedia("(prefers-color-scheme: dark)");
 
 function applyTheme() {
-  const prefer = localStorage.getItem("pe-theme") || "system";
-  const effective = prefer === "system" ? (media.matches ? "dark" : "light") : prefer;
-  document.documentElement.dataset.theme = effective;
-  document.body.dataset.theme = effective;
-  document.querySelectorAll("#theme-seg .seg").forEach((b) => {
-    b.classList.toggle("active", b.dataset.themeVal === prefer);
-  });
+  root.dataset.theme = mediaDark.matches ? "dark" : "light";
 }
 
-els.themeSeg.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".seg");
-  if (!btn) return;
-  const theme = btn.dataset.themeVal;
-  localStorage.setItem("pe-theme", theme);
-  applyTheme();
-  try {
-    await invoke("set_theme", { theme });
-  } catch (err) { /* 忽略 */ }
-});
-
-media.addEventListener("change", applyTheme);
-
-/* ---------- 外观（字体/字号） ---------- */
-function applyFont() {
-  const font = els.fontSelect.value;
-  const size = parseInt(els.fontSize.value, 10) || 13;
-  const root = document.documentElement.style;
-  if (font) root.setProperty("--font-ui", `"${font}"`);
-  else root.removeProperty("--font-ui");
-  root.setProperty("--fs", size + "px");
-  els.sizeVal.textContent = size + " px";
-  els.fontSize.style.setProperty("--fill", ((size - 11) / (18 - 11)) * 100 + "%");
-  // 字体下拉自身的选项文字跟随所选字体
-  els.fontSelect.style.fontFamily = font || "inherit";
+/* ---------- 外观（字号；界面字体固定微软雅黑，由 CSS --font-ui 提供） ---------- */
+function applyFontSize() {
+  const size = state.fontSize > 0 ? state.fontSize : DEFAULT_FONT_SIZE;
+  root.style.setProperty("--fs", size + "px");
+  elements.fontSize.value = String(size);
+  elements.sizeVal.textContent = size + " px";
+  elements.fontSize.style.setProperty("--fill", ((size - 11) / (18 - 11)) * 100 + "%");
 }
-
-els.fontSelect.addEventListener("change", async () => {
-  applyFont();
-  try {
-    await invoke("set_font", { font: els.fontSelect.value, font_size: parseInt(els.fontSize.value, 10) || 0 });
-  } catch (e) { toast("保存字体失败：" + e, true); }
-});
-
-els.fontSize.addEventListener("input", applyFont);
-els.fontSize.addEventListener("change", async () => {
-  try {
-    await invoke("set_font", { font: els.fontSelect.value, font_size: parseInt(els.fontSize.value, 10) || 0 });
-  } catch (e) { toast("保存字号失败：" + e, true); }
-});
 
 /* ---------- 设置弹窗 ---------- */
-function openModal() {
-  els.modal.classList.remove("hidden");
-  // 不自动聚焦关闭按钮，避免显示焦点环
-  els.modal.focus({ preventScroll: true });
-}
-function closeModal() {
-  els.modal.classList.add("hidden");
+function renderSettings() {
+  elements.silentStartupRow.hidden = !state.autostart;
+  setSwitch(elements.autostartToggle, elements.autostartLabel, state.autostart);
+  setSwitch(elements.silentStartupToggle, elements.silentStartupLabel, state.silentStartup);
 }
 
-els.btnSettings.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  openModal();
-});
-els.modalClose.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  closeModal();
-});
-els.modal.addEventListener("pointerdown", (e) => {
-  if (e.target === els.modal) closeModal(); // 点击遮罩关闭
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !els.modal.classList.contains("hidden")) closeModal();
-});
+function openSettings() {
+  lastFocusedElement = document.activeElement;
+  renderSettings();
+  elements.settingsModal.hidden = false;
+  elements.settingsClose.focus();
+}
 
-// Tab 切换
-els.modalTabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    els.modalTabs.forEach((t) => t.classList.toggle("active", t === tab));
-    const paneId = "tab-" + tab.dataset.tab;
-    document.querySelectorAll(".modal-body .tab-pane").forEach((p) => {
-      p.classList.toggle("hidden", p.id !== paneId);
-    });
-  });
-});
-
-/* ---------- 标题栏 ---------- */
-const tbLeft = $("tb-left");
-tbLeft.addEventListener("pointerdown", (e) => {
-  if (e.button !== 0) return;
-  if (e.target.closest(".tb-btn")) return;
-  try {
-    win && win.startDragging();
-  } catch (err) {
-    toast("拖拽失败：" + String(err), true);
+function closeSettings() {
+  elements.settingsModal.hidden = true;
+  if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+    lastFocusedElement.focus();
   }
-});
-els.btnMin.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  try { win && win.minimize(); } catch (err) { toast("最小化失败：" + String(err), true); }
-});
-els.btnClose.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  try { win && win.hide(); } catch (err) { toast("关闭失败：" + String(err), true); }
-});
-
-/* ---------- 协议类型 ---------- */
-const PROTO_INFO = {
-  HTTP: ["http", "将写入 HTTP_PROXY 与 HTTPS_PROXY"],
-  HTTPS: ["http", "目标走加密通道，同 HTTP_PROXY"],
-  SOCKS4: ["socks4", "将写入 ALL_PROXY"],
-  SOCKS4a: ["socks4a", "将写入 ALL_PROXY"],
-  SOCKS5: ["socks5", "将写入 ALL_PROXY"],
-  SOCKS5h: ["socks5h", "将写入 ALL_PROXY（远程 DNS，防泄漏）"],
-};
-
-// 协议与分段按钮映射（非三段类型回退到相近段）
-const SEG_FALLBACK = { HTTPS: "HTTP", SOCKS4: "SOCKS5", SOCKS4a: "SOCKS5" };
-
-function selectedProto() {
-  const seg = els.protoSeg.querySelector(".seg.active");
-  return seg ? seg.dataset.type : "HTTP";
 }
 
-els.protoSeg.addEventListener("click", (e) => {
-  const btn = e.target.closest(".seg");
-  if (!btn) return;
-  els.protoSeg.querySelectorAll(".seg").forEach((s) => s.classList.toggle("active", s === btn));
-  updatePreview();
-  syncBanner();
-});
-
-function renderProtoHint() {
-  const t = selectedProto();
-  els.protoHint.textContent = PROTO_INFO[t] ? PROTO_INFO[t][1] : "";
-}
-
-function setProto(type) {
-  const target = SEG_FALLBACK[type] || type;
-  let matched = false;
-  els.protoSeg.querySelectorAll(".seg").forEach((s) => {
-    const on = s.dataset.type === target;
-    s.classList.toggle("active", on);
-    if (on) matched = true;
-  });
-  if (!matched) els.protoSeg.querySelector(".seg").classList.add("active");
-  renderProtoHint();
-}
-
-/* ---------- 数据收集 ---------- */
-function collectSettings() {
-  return {
-    proxy_type: selectedProto(),
-    host: els.host.value.trim(),
-    port: parseInt(els.port.value, 10) || 7890,
-    username: els.username.value.trim(),
-    password: els.password.value.trim(),
-    no_proxy: els.noProxy.value.trim(),
-    advanced: {
-      http_proxy: els.advHttp.value.trim(),
-      https_proxy: els.advHttps.value.trim(),
-      all_proxy: els.advAll.value.trim(),
-      no_proxy: els.advNoProxy.value.trim(),
-    },
-    use_advanced: els.useAdvanced.checked,
-    autostart: els.autostart.checked,
-    theme: localStorage.getItem("pe-theme") || "system",
-    font: els.fontSelect.value,
-    font_size: parseInt(els.fontSize.value, 10) || 0,
-  };
-}
-
-function fillForm(s) {
-  if (!s) return;
-  els.host.value = s.host || "";
-  els.port.value = s.port || 7890;
-  els.username.value = s.username || "";
-  els.password.value = s.password || "";
-  els.noProxy.value = s.no_proxy || "localhost,127.0.0.1,::1";
-  els.useAdvanced.checked = !!s.use_advanced;
-  const a = s.advanced || {};
-  els.advHttp.value = a.http_proxy || "";
-  els.advHttps.value = a.https_proxy || "";
-  els.advAll.value = a.all_proxy || "";
-  els.advNoProxy.value = a.no_proxy || "";
-  els.autostart.checked = !!s.autostart;
-  setProto(s.proxy_type || "HTTP");
-  // 外观
-  if (s.font && els.fontSelect.value !== s.font) els.fontSelect.value = s.font;
-  if (s.font_size > 0) els.fontSize.value = s.font_size;
-}
-
-/* ---------- 变量预告 ---------- */
-function updatePreview() {
-  if (els.useAdvanced.checked) {
-    const adv = collectSettings().advanced;
-    els.protoHint.textContent = "高级模式已启用，将按下方变量写入";
-    const active = [adv.http_proxy, adv.https_proxy, adv.all_proxy, adv.no_proxy]
-      .some((v) => v.trim());
-    if (!active) els.protoHint.textContent = "高级模式已启用（未填变量，将以表单为准）";
-    return;
+function trapModalFocus(event) {
+  if (event.key !== "Tab" || elements.settingsModal.hidden) return;
+  const focusable = qsa(
+    "#settingsModal button, #settingsModal input, #settingsModal select, #settingsModal [tabindex]:not([tabindex='-1'])"
+  ).filter((el) => !el.disabled && el.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
   }
-  renderProtoHint();
 }
 
-/* ---------- 配置脏检测（与 Rust proxy_rules 逻辑对齐） ---------- */
-function rustUrlEncode(s) {
-  // 模拟 urlencoding crate：除 unreserved 外全部百分号编码
-  return encodeURIComponent(s).replace(/[!'()*]/g, (c) =>
-    "%" + c.charCodeAt(0).toString(16).toUpperCase()
-  );
+/* ---------- 单选组（SOCKS5 / SOCKS5h） ---------- */
+function syncRadioGroup(container, dataKey, selectedValue) {
+  qsa(`[data-${dataKey}]`, container).forEach((button) => {
+    const selected = button.dataset[dataKey] === selectedValue;
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
 }
 
-function buildProxyUrl(s, scheme) {
+function handleRadioGroupKeydown(event, container, dataKey) {
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  const buttons = qsa(`[data-${dataKey}]`, container);
+  const currentIndex = buttons.indexOf(event.target.closest(`[data-${dataKey}]`));
+  if (currentIndex < 0) return;
+  const direction = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+  const nextIndex = (currentIndex + direction + buttons.length) % buttons.length;
+  event.preventDefault();
+  buttons[nextIndex].focus();
+  buttons[nextIndex].click();
+}
+
+/* ---------- 代理 URL 构建（与 Rust proxy_rules 对齐） ---------- */
+function encodeUserInfo(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) => {
+    return "%" + character.charCodeAt(0).toString(16).toUpperCase();
+  });
+}
+
+function buildProxyUrl({ scheme, host, port, username, password }) {
   let url = scheme + "://";
-  if (s.username) {
-    url += rustUrlEncode(s.username);
-    if (s.password) url += ":" + rustUrlEncode(s.password);
+  if (username) {
+    url += encodeUserInfo(username);
+    if (password) {
+      url += ":" + encodeUserInfo(password);
+    }
     url += "@";
   }
-  url += s.host.trim();
-  url += ":" + s.port;
-  return url;
+  return url + String(host).trim() + ":" + String(port).trim();
 }
 
-const SOCKS_SCHEMES = { SOCKS4: "socks4", SOCKS4a: "socks4a", SOCKS5: "socks5", SOCKS5h: "socks5h" };
-
-/** 由当前表单推导"应写入"的变量集（剔除空值，与 read_var 过滤一致） */
-function computePreviewVars() {
-  const s = collectSettings();
-  const vars = {};
-  if (s.use_advanced) {
-    const a = s.advanced || {};
-    for (const [n, v] of [
-      ["HTTP_PROXY", a.http_proxy],
-      ["HTTPS_PROXY", a.https_proxy],
-      ["ALL_PROXY", a.all_proxy],
-      ["NO_PROXY", a.no_proxy],
-    ]) {
-      if (v && v.trim()) vars[n] = v.trim();
+function maskedProxyUrl(value) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.username || parsed.password) {
+      parsed.username = parsed.username ? "user" : "";
+      parsed.password = parsed.password ? "••••••" : "";
     }
-    return vars;
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return value.replace(/:\/\/([^:@/]+):([^@/]+)@/, "://$1:••••••@");
   }
-  const isSocks = s.proxy_type in SOCKS_SCHEMES;
-  if (s.host.trim()) {
-    const scheme = isSocks ? SOCKS_SCHEMES[s.proxy_type] : "http";
-    const u = buildProxyUrl(s, scheme);
-    if (isSocks) vars.ALL_PROXY = u;
-    else { vars.HTTP_PROXY = u; vars.HTTPS_PROXY = u; }
+}
+
+function isReusingHttp() {
+  return state.socksEnabled && state.httpEnabled && state.socksReuseHttp;
+}
+
+function getAutoVars() {
+  const vars = {};
+
+  if (state.httpEnabled) {
+    const value = buildProxyUrl({
+      scheme: "http",
+      host: elements.httpHost.value,
+      port: elements.httpPort.value,
+      username: elements.httpUser.value.trim(),
+      password: elements.httpPassword.value,
+    });
+    vars.HTTP_PROXY = value;
+    vars.HTTPS_PROXY = value;
   }
-  if (s.no_proxy.trim()) vars.NO_PROXY = s.no_proxy.trim();
+
+  if (state.socksEnabled) {
+    const reuse = isReusingHttp();
+    vars.ALL_PROXY = buildProxyUrl({
+      scheme: state.socksScheme,
+      host: reuse ? elements.httpHost.value : elements.socksHost.value,
+      port: reuse ? elements.httpPort.value : elements.socksPort.value,
+      username: reuse ? elements.httpUser.value.trim() : elements.socksUser.value.trim(),
+      password: reuse ? elements.httpPassword.value : elements.socksPassword.value,
+    });
+  }
+
+  if ((state.httpEnabled || state.socksEnabled) && elements.noProxy.value.trim()) {
+    vars.NO_PROXY = elements.noProxy.value.trim();
+  }
+
   return vars;
 }
 
-function currentEnvVars() {
-  const e = (state && state.env) || {};
+function getAdvancedVars() {
   const vars = {};
-  for (const [k, kk] of [
+  const values = {
+    HTTP_PROXY: elements.advHttp.value.trim(),
+    HTTPS_PROXY: elements.advHttps.value.trim(),
+    ALL_PROXY: elements.advAll.value.trim(),
+    NO_PROXY: elements.advNoProxy.value.trim(),
+  };
+  variableOrder.forEach((name) => {
+    if (values[name]) vars[name] = values[name];
+  });
+  return vars;
+}
+
+function getPreviewVars() {
+  return state.advancedEnabled ? getAdvancedVars() : getAutoVars();
+}
+
+function varsEqual(left, right) {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if ((left[key] || "") !== (right[key] || "")) return false;
+  }
+  return true;
+}
+
+/* ---------- 渲染 ---------- */
+function renderPreview() {
+  const vars = getPreviewVars();
+  elements.previewList.replaceChildren();
+
+  const activeNames = variableOrder.filter((name) => vars[name]);
+  elements.previewMode.textContent = state.advancedEnabled ? "高级覆盖" : "普通模式";
+
+  if (!activeNames.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-vars";
+    empty.textContent = state.advancedEnabled
+      ? "高级模式已开启，但四个变量均为空。"
+      : "开启 HTTP(S) 或 SOCKS 后，这里会生成实际写入值。";
+    elements.previewList.appendChild(empty);
+    elements.previewSummaryText.textContent = state.advancedEnabled
+      ? "高级模式未生成变量"
+      : "尚未启用任何通道";
+    return;
+  }
+
+  activeNames.forEach((name) => {
+    const row = document.createElement("div");
+    row.className = "preview-row";
+
+    const nameWrap = document.createElement("div");
+    nameWrap.className = "preview-name";
+    const nameText = document.createElement("span");
+    nameText.textContent = name;
+    nameWrap.appendChild(nameText);
+
+    const meta = variableMeta[name];
+    if (meta) {
+      const tag = document.createElement("span");
+      tag.className = "preview-tag";
+      tag.textContent = meta.tag;
+      nameWrap.appendChild(tag);
+    }
+
+    const value = document.createElement("div");
+    value.className = "preview-value";
+    value.title = vars[name];
+    value.textContent = name === "NO_PROXY" ? vars[name] : maskedProxyUrl(vars[name]);
+
+    row.append(nameWrap, value);
+    elements.previewList.appendChild(row);
+  });
+
+  const channelCount = [state.httpEnabled, state.socksEnabled].filter(Boolean).length;
+  if (state.advancedEnabled) {
+    elements.previewSummaryText.textContent = `将由 ${activeNames.length} 个手动变量覆盖普通配置`;
+  } else {
+    elements.previewSummaryText.textContent =
+      channelCount === 2
+        ? "HTTP(S) 与 SOCKS 将同时写入，按变量优先级生效"
+        : `已启用 ${channelCount} 个通道，将写入 ${activeNames.length} 个变量`;
+  }
+}
+
+function renderEnvironment() {
+  elements.envList.replaceChildren();
+  const vars = state.envActive ? state.envVars : {};
+
+  variableOrder.forEach((name) => {
+    const row = document.createElement("div");
+    row.className = "env-row" + (vars[name] ? " set" : "");
+
+    const dot = document.createElement("span");
+    dot.className = "env-dot";
+
+    const nameElement = document.createElement("span");
+    nameElement.className = "env-name";
+    nameElement.textContent = name;
+
+    const value = document.createElement("span");
+    value.className = "env-value" + (vars[name] ? "" : " unset");
+    value.textContent = vars[name] ? maskedProxyUrl(vars[name]) : "未设置";
+    value.title = vars[name] || "未设置";
+
+    row.append(dot, nameElement, value);
+    elements.envList.appendChild(row);
+  });
+}
+
+function setSwitch(button, label, checked) {
+  button.setAttribute("aria-checked", String(checked));
+  label.textContent = checked ? "已启用" : "未启用";
+}
+
+function setFieldDisabled(input, disabled) {
+  input.disabled = disabled;
+}
+
+function setResultRow(row, stateName, detail) {
+  row.classList.remove("ok", "fail", "running");
+  row.classList.add(stateName);
+  const detailElement = row.querySelector(".result-detail");
+  const stateElement = row.querySelector(".result-state");
+  if (stateName === "ok") {
+    detailElement.textContent = detail;
+    stateElement.textContent = "成功";
+  } else if (stateName === "fail") {
+    detailElement.textContent = detail;
+    stateElement.textContent = "失败";
+  } else if (stateName === "running") {
+    detailElement.textContent = detail;
+    stateElement.textContent = "测试中";
+  } else {
+    detailElement.textContent = detail || "等待测试";
+    stateElement.textContent = "未启用";
+  }
+}
+
+function channelAvailability(channel) {
+  if (state.advancedEnabled) {
+    return channel === "socks"
+      ? Boolean(elements.advAll.value.trim())
+      : Boolean(elements.advHttp.value.trim() || elements.advHttps.value.trim());
+  }
+  return channel === "socks" ? state.socksEnabled : state.httpEnabled;
+}
+
+function renderTestAvailability() {
+  const httpAvailable = channelAvailability("http");
+  const socksAvailable = channelAvailability("socks");
+
+  if (!httpAvailable && !elements.testPanel.dataset.started) {
+    setResultRow(elements.httpResult, "idle", "等待测试");
+  }
+  if (!socksAvailable && !elements.testPanel.dataset.started) {
+    setResultRow(elements.socksResult, "idle", "等待测试");
+  }
+
+  elements.testButton.disabled = state.testing || (!httpAvailable && !socksAvailable);
+}
+
+function updateChannelVisibility() {
+  setSwitch(elements.httpToggle, elements.httpSwitchLabel, state.httpEnabled);
+  setSwitch(elements.socksToggle, elements.socksSwitchLabel, state.socksEnabled);
+  setSwitch(elements.advancedToggle, elements.advancedSwitchLabel, state.advancedEnabled);
+
+  elements.httpBody.hidden = !state.httpEnabled;
+  elements.socksBody.hidden = !state.socksEnabled;
+
+  elements.httpChannel.classList.toggle("enabled", state.httpEnabled);
+  elements.socksChannel.classList.toggle("enabled", state.socksEnabled);
+  elements.httpChannel.classList.toggle("overridden", state.advancedEnabled);
+  elements.socksChannel.classList.toggle("overridden", state.advancedEnabled);
+
+  const reuse = isReusingHttp();
+  elements.socksReuse.disabled = !state.httpEnabled;
+  elements.socksReuse.checked = state.httpEnabled && state.socksReuseHttp;
+  elements.socksReuseHint.textContent = state.httpEnabled
+    ? state.socksReuseHttp
+      ? "沿用 HTTP(S) 的地址、端口和认证信息。"
+      : "已关闭，使用下方独立的 SOCKS 地址。"
+    : "HTTP(S) 未启用，SOCKS 将使用下方独立地址。";
+
+  setFieldDisabled(elements.socksHost, reuse);
+  setFieldDisabled(elements.socksPort, reuse);
+  setFieldDisabled(elements.socksUser, reuse);
+  setFieldDisabled(elements.socksPassword, reuse);
+
+  elements.socksHint.textContent =
+    state.socksScheme === "socks5"
+      ? "SOCKS5：由本机解析域名，随后把目标 IP 交给代理。"
+      : "SOCKS5h：由代理端解析域名，可减少本地 DNS 泄漏。";
+  syncRadioGroup(elements.socksVariant, "scheme", state.socksScheme);
+
+  [elements.advHttp, elements.advHttps, elements.advAll, elements.advNoProxy].forEach((input) => {
+    input.disabled = !state.advancedEnabled;
+  });
+}
+
+function previewCounts() {
+  const vars = getPreviewVars();
+  return {
+    vars,
+    count: Object.keys(vars).length,
+    hasRoutes: Boolean(vars.HTTP_PROXY || vars.HTTPS_PROXY || vars.ALL_PROXY),
+  };
+}
+
+function renderActions() {
+  const { count, hasRoutes } = previewCounts();
+  const dirty = state.envActive && !varsEqual(getPreviewVars(), state.envVars);
+  const canApply = hasRoutes;
+
+  elements.statusBadge.classList.toggle("active", state.envActive && !dirty);
+  elements.statusBadge.classList.toggle("dirty", dirty);
+  elements.statusBadge.textContent = dirty ? "有未应用更改" : state.envActive ? "已启用" : "未启用";
+
+  elements.dirtyBanner.hidden = !dirty;
+
+  if (state.envActive) {
+    elements.masterButton.disabled = false;
+    elements.masterButton.querySelector(".button-label").textContent = "停用代理";
+    elements.actionSummary.textContent = "代理已写入当前用户环境变量；编辑后需应用更改。";
+  } else {
+    elements.masterButton.disabled = !canApply;
+    elements.masterButton.querySelector(".button-label").textContent = "应用并启用";
+    elements.actionSummary.textContent = canApply
+      ? `当前配置将写入 ${count} 个环境变量。`
+      : "开启至少一个通道后即可写入当前用户环境变量。";
+  }
+
+  elements.clearButton.disabled = !state.envActive && count === 0;
+}
+
+function render() {
+  updateChannelVisibility();
+  renderPreview();
+  renderEnvironment();
+  renderActions();
+  renderTestAvailability();
+}
+
+/* ---------- 校验 ---------- */
+function clearValidation(input, errorElement) {
+  input.removeAttribute("aria-invalid");
+  if (errorElement) errorElement.textContent = "";
+}
+
+function setValidation(input, errorElement, message) {
+  input.setAttribute("aria-invalid", "true");
+  if (errorElement) errorElement.textContent = message;
+}
+
+function validateHost(input, errorElement) {
+  if (!input.disabled && !input.value.trim()) {
+    setValidation(input, errorElement, "请填写服务器地址，例如 127.0.0.1。");
+    return false;
+  }
+  clearValidation(input, errorElement);
+  return true;
+}
+
+function validatePort(input, errorElement) {
+  if (input.disabled) {
+    clearValidation(input, errorElement);
+    return true;
+  }
+  const port = Number(input.value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    setValidation(input, errorElement, "端口必须是 1 到 65535 之间的整数。");
+    return false;
+  }
+  clearValidation(input, errorElement);
+  return true;
+}
+
+function validateAuthPair(userInput, passwordInput, errorElement) {
+  const hasUser = Boolean(userInput.value.trim());
+  const hasPassword = Boolean(passwordInput.value);
+  const active = !userInput.disabled && !passwordInput.disabled;
+  if (active && hasUser !== hasPassword) {
+    setValidation(hasUser ? passwordInput : userInput, errorElement, "用户名和密码需要同时填写。");
+    return false;
+  }
+  clearValidation(userInput, errorElement);
+  clearValidation(passwordInput, errorElement);
+  return true;
+}
+
+function validateUrl(input, errorElement) {
+  const value = input.value.trim();
+  if (!input.disabled && value && !/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    setValidation(input, errorElement, "请输入完整 URL，例如 http://127.0.0.1:7890。");
+    return false;
+  }
+  clearValidation(input, errorElement);
+  return true;
+}
+
+function validateVisibleFields() {
+  const checks = [];
+
+  if (state.advancedEnabled) {
+    checks.push(validateUrl(elements.advHttp, elements.advHttpError));
+    checks.push(validateUrl(elements.advHttps, elements.advHttpsError));
+    checks.push(validateUrl(elements.advAll, elements.advAllError));
+    const firstInvalid = [elements.advHttp, elements.advHttps, elements.advAll].find(
+      (input) => input.getAttribute("aria-invalid") === "true"
+    );
+    if (firstInvalid) firstInvalid.focus();
+    return checks.every(Boolean);
+  }
+
+  if (state.httpEnabled) {
+    checks.push(validateHost(elements.httpHost, elements.httpHostError));
+    checks.push(validatePort(elements.httpPort, elements.httpPortError));
+    checks.push(validateAuthPair(elements.httpUser, elements.httpPassword, elements.httpAuthError));
+  }
+
+  if (state.socksEnabled && !isReusingHttp()) {
+    checks.push(validateHost(elements.socksHost, elements.socksHostError));
+    checks.push(validatePort(elements.socksPort, elements.socksPortError));
+    checks.push(validateAuthPair(elements.socksUser, elements.socksPassword, elements.socksAuthError));
+  } else {
+    clearValidation(elements.socksHost, elements.socksHostError);
+    clearValidation(elements.socksPort, elements.socksPortError);
+    clearValidation(elements.socksUser, elements.socksAuthError);
+    clearValidation(elements.socksPassword, elements.socksAuthError);
+  }
+
+  const firstInvalid = [
+    elements.httpHost,
+    elements.httpPort,
+    elements.httpUser,
+    elements.httpPassword,
+    elements.socksHost,
+    elements.socksPort,
+    elements.socksUser,
+    elements.socksPassword,
+  ].find((input) => input.getAttribute("aria-invalid") === "true" && !input.disabled);
+
+  if (firstInvalid) firstInvalid.focus();
+  return checks.every(Boolean);
+}
+
+/* ---------- 后端设置对象 ---------- */
+function collectSettings() {
+  return {
+    http: {
+      enabled: state.httpEnabled,
+      host: elements.httpHost.value.trim(),
+      port: Number(elements.httpPort.value) || 7890,
+      username: elements.httpUser.value.trim(),
+      password: elements.httpPassword.value,
+    },
+    socks: {
+      enabled: state.socksEnabled,
+      host: elements.socksHost.value.trim(),
+      port: Number(elements.socksPort.value) || 7891,
+      username: elements.socksUser.value.trim(),
+      password: elements.socksPassword.value,
+    },
+    socks_scheme: state.socksScheme,
+    socks_reuse_http: state.socksReuseHttp,
+    no_proxy: elements.noProxy.value.trim(),
+    advanced: {
+      http_proxy: elements.advHttp.value.trim(),
+      https_proxy: elements.advHttps.value.trim(),
+      all_proxy: elements.advAll.value.trim(),
+      no_proxy: elements.advNoProxy.value.trim(),
+    },
+    use_advanced: state.advancedEnabled,
+    autostart: state.autostart,
+    silent_startup: state.silentStartup,
+    theme: "system",
+    font_size: state.fontSize,
+  };
+}
+
+function setEnvVars(env) {
+  const vars = {};
+  [
     ["HTTP_PROXY", "http_proxy"],
     ["HTTPS_PROXY", "https_proxy"],
     ["ALL_PROXY", "all_proxy"],
     ["NO_PROXY", "no_proxy"],
-  ]) {
-    if (e[kk]) vars[k] = e[kk];
-  }
-  return vars;
+  ].forEach(([name, key]) => {
+    if (env && env[key]) vars[name] = env[key];
+  });
+  state.envVars = vars;
+  state.envActive = Boolean(env && env.active);
 }
 
-/** 表单当前推导 ≠ 实际生效 → 有未应用更改 */
-function isDirty() {
-  const p = computePreviewVars();
-  const e = currentEnvVars();
-  const keys = new Set([...Object.keys(p), ...Object.keys(e)]);
-  for (const k of keys) {
-    if ((p[k] || "") !== (e[k] || "")) return true;
-  }
-  return false;
+function applySnapshot(snapshot) {
+  const s = snapshot.settings || {};
+  const http = s.http || {};
+  const socks = s.socks || {};
+  const advanced = s.advanced || {};
+
+  elements.httpHost.value = http.host || "";
+  elements.httpPort.value = http.port || 7890;
+  elements.httpUser.value = http.username || "";
+  elements.httpPassword.value = http.password || "";
+  elements.socksHost.value = socks.host || "";
+  elements.socksPort.value = socks.port || 7891;
+  elements.socksUser.value = socks.username || "";
+  elements.socksPassword.value = socks.password || "";
+  elements.noProxy.value = s.no_proxy || DEFAULT_NO_PROXY;
+  elements.advHttp.value = advanced.http_proxy || "";
+  elements.advHttps.value = advanced.https_proxy || "";
+  elements.advAll.value = advanced.all_proxy || "";
+  elements.advNoProxy.value = advanced.no_proxy || "";
+
+  state.httpEnabled = Boolean(http.enabled);
+  state.socksEnabled = Boolean(socks.enabled);
+  state.socksScheme = s.socks_scheme === "socks5" ? "socks5" : "socks5h";
+  state.socksReuseHttp = s.socks_reuse_http !== false;
+  state.advancedEnabled = Boolean(s.use_advanced);
+  state.autostart = Boolean(s.autostart);
+  state.silentStartup = Boolean(s.silent_startup);
+  state.fontSize = s.font_size || 0;
+
+  setEnvVars(snapshot.env);
+  applyFontSize();
+  renderSettings();
+  render();
 }
 
-/** 仅在"启用中"显示横幅；停用/未启用隐藏 */
-function syncBanner() {
-  const show = !!(state && state.env.active && isDirty());
-  els.applyBanner.classList.toggle("hidden", !show);
-}
-
-/* ---------- 状态渲染 ---------- */
-function renderState(env) {
-  // 强制状态条纵向布局（inline 优先，不受样式表/缓存影响）
-  const strip = els.stateStrip;
-  strip.style.display = "flex";
-  strip.style.flexDirection = "column";
-  strip.style.gap = "5px";
-  strip.style.alignItems = "stretch";
-
-  const items = [
-    ["HTTP_PROXY", env.http_proxy],
-    ["HTTPS_PROXY", env.https_proxy],
-    ["ALL_PROXY", env.all_proxy],
-    ["NO_PROXY", env.no_proxy],
-  ];
-  const setCount = items.filter(([, v]) => !!v).length;
-  els.stateStrip.innerHTML = setCount
-    ? items
-        .map(([name, val]) =>
-          `<div class="ss-item"><span class="ss-dot ${val ? "set" : "unset"}"></span>` +
-          `<span class="ss-name">${name}</span>` +
-          (val
-            ? `<span class="ss-val" title="${escapeHtml(val)}">${escapeHtml(val.length > 42 ? val.slice(0, 42) + "…" : val)}</span>`
-            : `<span class="ss-val ss-empty">未设置</span>`)
-        ).join("")
-    : '<div class="ss-noenv">当前未设置任何代理环境变量</div>';
-
-  els.badge.textContent = env.active ? "已启用" : "未启用";
-  els.badge.className = "badge " + (env.active ? "on" : "off");
-  els.master.classList.toggle("off", !env.active);
-  els.masterText.textContent = env.active ? "停用代理" : "启用代理";
-  // 图标表示动作：启用态 = 勾，停用态 = ×
-  const path = els.master.querySelector(".master-icon svg path");
-  if (path) {
-    path.setAttribute(
-      "d",
-      env.active
-        ? "M6.5 6.5l11 11M17.5 6.5l-11 11" // ×
-        : "M5 12.5l4.5 4.5L19 7.5" // 勾
-    );
+async function refresh() {
+  try {
+    applySnapshot(await invoke("get_state"));
+  } catch (e) {
+    showToast("读取状态失败：" + e, true);
   }
-  syncBanner();
 }
 
 /* ---------- 核心操作 ---------- */
-async function refresh() {
-  try {
-    state = await invoke("get_state");
-    fillForm(state.settings);
-    renderState(state.env);
-    updatePreview();
-    applyFont();
-  } catch (e) {
-    toast("读取状态失败：" + e, true);
+async function applyConfiguration() {
+  if (state.busy) return;
+  if (!validateVisibleFields()) {
+    showToast("请修正标红的配置项后再应用。", true);
+    return;
   }
-}
-
-async function doClear() {
-  try {
-    const r = await invoke("clear_proxy");
-    state = r;
-    renderState(r.env);
-    toast("已清除所有代理环境变量");
-  } catch (e) {
-    toast(String(e), true);
-  }
-}
-
-async function doTest() {
-  els.testResult.classList.add("hidden");
-  els.testBtn.textContent = "测试中…";
-  const dirty = isDirty();
-  const label = dirty ? "按当前表单值测试（未应用）· " : "";
-  try {
-    const r = await invoke("test_proxy", { settings: collectSettings() });
-    els.testResult.classList.remove("hidden");
-    if (r.ok) {
-      els.testResult.className = "test-result ok";
-      els.testResult.textContent = label + `连接成功 · 延迟 ${r.latency_ms} ms`;
-    } else {
-      els.testResult.className = "test-result fail";
-      els.testResult.textContent = label + `连接失败：${r.error || "未知错误"}`;
+  const vars = getPreviewVars();
+  if (!vars.HTTP_PROXY && !vars.HTTPS_PROXY && !vars.ALL_PROXY) {
+    // 两个通道都关掉就是"停用"意图：清变量并把 enabled=false 写回配置，而不是报错。
+    // （主按钮"停用代理"走 clear_proxy，只清变量、保留配置，方便一键重开。）
+    if (state.envActive) {
+      state.busy = true;
+      try {
+        applySnapshot(await invoke("disable_proxy"));
+        resetTestResults();
+        showToast("已停用代理，环境变量已清除。");
+      } catch (e) {
+        showToast(String(e), true);
+      } finally {
+        state.busy = false;
+      }
+      return;
     }
+    showToast("当前没有启用的通道，无需应用。");
+    return;
+  }
+  state.busy = true;
+  try {
+    applySnapshot(await invoke("apply_proxy", { settings: collectSettings() }));
+    showToast("配置已应用。新打开的程序和终端会读取这些变量。");
   } catch (e) {
-    els.testResult.className = "test-result fail";
-    els.testResult.textContent = "测试出错：" + e;
-    els.testResult.classList.remove("hidden");
+    showToast(String(e), true);
   } finally {
-    els.testBtn.textContent = "测试连通性";
+    state.busy = false;
   }
 }
 
-/* ---------- 事件绑定 ---------- */
-els.master.addEventListener("pointerdown", async (e) => {
-  e.preventDefault();
-  const isActive = !!(state && state.env.active);
-  if (isActive) {
-    try {
-      const r = await invoke("clear_proxy");
-      state = r; // 同步内部状态，确保图标/文案/颜色立即刷新
-      renderState(r.env);
-      toast("已停用代理，环境变量已清除");
-    } catch (err) {
-      toast(String(err), true);
-    }
-    return;
-  }
-  const host = els.host.value.trim();
-  if (!host && !els.useAdvanced.checked) {
-    toast("请先填写代理地址（如 127.0.0.1）", true);
-    els.host.focus();
-    return;
-  }
+async function clearConfiguration(showMessage = true) {
+  if (state.busy) return;
+  state.busy = true;
   try {
-    const r = await invoke("apply_proxy", { settings: collectSettings() });
-    state = r;
-    renderState(r.env);
-    toast("代理已启用，新终端立即生效");
-  } catch (err) {
-    toast(String(err), true);
-  }
-});
-
-els.clearBtn.addEventListener("pointerdown", async (e) => {
-  e.preventDefault();
-  if (state && !state.env.active) {
-    toast("当前未启用代理，无需清除");
-    return;
-  }
-  await doClear();
-});
-
-els.testBtn.addEventListener("click", doTest);
-
-/* 所有会影响写入变量的输入变化 → 更新预告 + 脏检测 */
-const formInputs = [
-  els.host, els.port, els.username, els.password, els.noProxy,
-  els.useAdvanced, els.advHttp, els.advHttps, els.advAll, els.advNoProxy,
-];
-formInputs.forEach((el) =>
-  el.addEventListener("input", () => {
-    updatePreview();
-    syncBanner();
-  })
-);
-els.noProxy.addEventListener("change", syncBanner);
-els.advNoProxy.addEventListener("change", syncBanner);
-els.username.addEventListener("change", syncBanner);
-els.password.addEventListener("change", syncBanner);
-els.useAdvanced.addEventListener("change", () => {
-  updatePreview();
-  syncBanner();
-});
-
-/* 应用更改：无感重写 + 保存，保持启用 */
-els.btnApply.addEventListener("pointerdown", async (e) => {
-  e.preventDefault();
-  const s = collectSettings();
-  if (!s.use_advanced && !s.host.trim()) {
-    toast("请先填写代理地址", true);
-    els.host.focus();
-    return;
-  }
-  try {
-    const r = await invoke("apply_proxy", { settings: s });
-    state = r;
-    renderState(r.env);
-    updatePreview();
-    toast("配置已应用，新终端立即生效");
-  } catch (err) {
-    toast("应用失败：" + err, true);
-  }
-});
-
-els.advToggle.addEventListener("pointerdown", (e) => {
-  e.preventDefault();
-  els.advBody.classList.toggle("hidden");
-  els.advChevron.classList.toggle("open");
-  els.advToggle.setAttribute("aria-expanded", !els.advBody.classList.contains("hidden"));
-});
-
-els.autostart.addEventListener("change", async () => {
-  try {
-    const ok = await invoke("set_autostart", { enabled: els.autostart.checked });
-    els.autostart.checked = ok;
-    toast(ok ? "已加入开机自启" : "已关闭开机自启");
+    applySnapshot(await invoke("clear_proxy"));
+    resetTestResults();
+    if (showMessage) showToast("代理环境变量已清除。");
   } catch (e) {
-    els.autostart.checked = !els.autostart.checked;
-    toast("设置开机自启失败：" + e, true);
+    showToast(String(e), true);
+  } finally {
+    state.busy = false;
+  }
+}
+
+/* ---------- 连通性测试 ---------- */
+async function runChannelTest(channel) {
+  const row = channel === "http" ? elements.httpResult : elements.socksResult;
+  setResultRow(row, "running", "正在建立连接并读取响应…");
+  try {
+    const r = await invoke("test_channel", { settings: collectSettings(), channel });
+    if (r.ok) {
+      setResultRow(row, "ok", `代理握手成功，往返延迟 ${r.latency_ms} ms。`);
+      return true;
+    }
+    setResultRow(row, "fail", `无法通过该通道连接：${r.error || "未知错误"}`);
+    return false;
+  } catch (e) {
+    setResultRow(row, "fail", "测试出错：" + String(e));
+    return false;
+  }
+}
+
+async function testChannels() {
+  if (!validateVisibleFields()) {
+    showToast("请先修正配置项，再执行连通性测试。", true);
+    return;
+  }
+
+  const httpAvailable = channelAvailability("http");
+  const socksAvailable = channelAvailability("socks");
+  if (!httpAvailable && !socksAvailable) {
+    showToast("当前没有可测试的通道。", true);
+    return;
+  }
+
+  state.testing = true;
+  elements.testPanel.hidden = false;
+  elements.testPanel.dataset.started = "true";
+  elements.testButton.classList.add("is-loading");
+  elements.testButton.querySelector(".button-label").textContent = "测试中";
+  elements.testButton.disabled = true;
+
+  const tasks = [];
+  if (httpAvailable) {
+    tasks.push(runChannelTest("http"));
+  } else {
+    setResultRow(elements.httpResult, "idle", "当前未启用 HTTP(S) 通道。");
+  }
+  if (socksAvailable) {
+    tasks.push(runChannelTest("socks"));
+  } else {
+    setResultRow(elements.socksResult, "idle", "当前未启用 SOCKS 通道。");
+  }
+
+  const results = await Promise.all(tasks);
+
+  state.testing = false;
+  elements.testButton.classList.remove("is-loading");
+  elements.testButton.querySelector(".button-label").textContent = "测试通道";
+  renderTestAvailability();
+
+  const successCount = results.filter(Boolean).length;
+  showToast(
+    successCount === results.length
+      ? `测试完成，${successCount} 个通道连接成功。`
+      : "测试完成，存在连接失败的通道。",
+    successCount !== results.length
+  );
+}
+
+function resetTestResults() {
+  elements.testPanel.hidden = true;
+  elements.testPanel.dataset.started = "";
+  setResultRow(elements.httpResult, "idle", "等待测试");
+  setResultRow(elements.socksResult, "idle", "等待测试");
+  renderTestAvailability();
+}
+
+function resetTestResultsUnlessRunning() {
+  if (!state.testing && elements.testPanel.dataset.started) {
+    resetTestResults();
+  }
+}
+
+/* ---------- 高级模式 ---------- */
+function ensureAdvancedSeed() {
+  const hasAnyAdvancedValue = [
+    elements.advHttp,
+    elements.advHttps,
+    elements.advAll,
+    elements.advNoProxy,
+  ].some((input) => input.value.trim());
+  if (hasAnyAdvancedValue) return;
+  const vars = getAutoVars();
+  elements.advHttp.value = vars.HTTP_PROXY || "";
+  elements.advHttps.value = vars.HTTPS_PROXY || "";
+  elements.advAll.value = vars.ALL_PROXY || "";
+  elements.advNoProxy.value = vars.NO_PROXY || "";
+}
+
+/* ---------- 事件 ---------- */
+function attachValidationEvents() {
+  [
+    [elements.httpHost, () => validateHost(elements.httpHost, elements.httpHostError)],
+    [elements.httpPort, () => validatePort(elements.httpPort, elements.httpPortError)],
+    [
+      elements.httpUser,
+      () => validateAuthPair(elements.httpUser, elements.httpPassword, elements.httpAuthError),
+    ],
+    [
+      elements.httpPassword,
+      () => validateAuthPair(elements.httpUser, elements.httpPassword, elements.httpAuthError),
+    ],
+    [elements.socksHost, () => validateHost(elements.socksHost, elements.socksHostError)],
+    [elements.socksPort, () => validatePort(elements.socksPort, elements.socksPortError)],
+    [
+      elements.socksUser,
+      () => validateAuthPair(elements.socksUser, elements.socksPassword, elements.socksAuthError),
+    ],
+    [
+      elements.socksPassword,
+      () => validateAuthPair(elements.socksUser, elements.socksPassword, elements.socksAuthError),
+    ],
+    [elements.advHttp, () => validateUrl(elements.advHttp, elements.advHttpError)],
+    [elements.advHttps, () => validateUrl(elements.advHttps, elements.advHttpsError)],
+    [elements.advAll, () => validateUrl(elements.advAll, elements.advAllError)],
+  ].forEach(([input, handler]) => input.addEventListener("blur", handler));
+
+  [
+    elements.httpHost,
+    elements.httpPort,
+    elements.httpUser,
+    elements.httpPassword,
+    elements.socksHost,
+    elements.socksPort,
+    elements.socksUser,
+    elements.socksPassword,
+    elements.advHttp,
+    elements.advHttps,
+    elements.advAll,
+  ].forEach((input) => {
+    input.addEventListener("input", () => input.removeAttribute("aria-invalid"));
+  });
+}
+
+function attachFormEvents() {
+  [
+    elements.httpHost,
+    elements.httpPort,
+    elements.httpUser,
+    elements.httpPassword,
+    elements.socksHost,
+    elements.socksPort,
+    elements.socksUser,
+    elements.socksPassword,
+    elements.noProxy,
+    elements.advHttp,
+    elements.advHttps,
+    elements.advAll,
+    elements.advNoProxy,
+  ].forEach((input) => {
+    input.addEventListener("input", () => {
+      resetTestResultsUnlessRunning();
+      render();
+    });
+  });
+}
+
+elements.settingsButton.addEventListener("click", openSettings);
+elements.settingsClose.addEventListener("click", closeSettings);
+elements.settingsModal.addEventListener("click", (event) => {
+  if (event.target === elements.settingsModal) closeSettings();
+});
+
+elements.autostartToggle.addEventListener("click", async () => {
+  const next = !state.autostart;
+  try {
+    const ok = await invoke("set_autostart", { enabled: next });
+    state.autostart = ok;
+    if (!ok) state.silentStartup = false;
+    showToast(ok ? "已加入开机自启" : "已关闭开机自启");
+  } catch (e) {
+    showToast("设置开机自启失败：" + e, true);
+  }
+  renderSettings();
+});
+
+elements.silentStartupToggle.addEventListener("click", async () => {
+  const next = !state.silentStartup;
+  setSwitch(elements.silentStartupToggle, elements.silentStartupLabel, next);
+  try {
+    state.silentStartup = await invoke("set_silent_startup", { enabled: next });
+    showToast(state.silentStartup ? "已开启静默启动" : "已关闭静默启动");
+  } catch (e) {
+    showToast("设置静默启动失败：" + e, true);
+  }
+  renderSettings();
+});
+
+elements.fontSize.addEventListener("input", () => {
+  state.fontSize = Number(elements.fontSize.value) || DEFAULT_FONT_SIZE;
+  applyFontSize();
+});
+elements.fontSize.addEventListener("change", async () => {
+  try {
+    await invoke("set_font", { font_size: state.fontSize });
+  } catch (e) {
+    showToast("保存字号失败：" + e, true);
+  }
+});
+
+elements.socksVariant.addEventListener("keydown", (event) => {
+  handleRadioGroupKeydown(event, elements.socksVariant, "scheme");
+});
+
+elements.httpToggle.addEventListener("click", () => {
+  state.httpEnabled = !state.httpEnabled;
+  if (!state.httpEnabled) {
+    state.socksReuseHttp = false;
+  } else if (state.socksEnabled) {
+    state.socksReuseHttp = true;
+  }
+  resetTestResults();
+  render();
+});
+
+elements.socksToggle.addEventListener("click", () => {
+  state.socksEnabled = !state.socksEnabled;
+  if (state.socksEnabled && state.httpEnabled) {
+    state.socksReuseHttp = true;
+  }
+  if (!state.socksEnabled) {
+    state.socksReuseHttp = state.httpEnabled;
+  }
+  resetTestResults();
+  render();
+});
+
+elements.socksVariant.addEventListener("click", (event) => {
+  const button = event.target.closest(".variant-button");
+  if (!button) return;
+  state.socksScheme = button.dataset.scheme;
+  resetTestResults();
+  render();
+});
+
+elements.socksReuse.addEventListener("change", () => {
+  if (!elements.socksReuse.disabled) {
+    state.socksReuseHttp = elements.socksReuse.checked;
+  }
+  resetTestResults();
+  render();
+});
+
+elements.advancedToggle.addEventListener("click", () => {
+  state.advancedEnabled = !state.advancedEnabled;
+  if (state.advancedEnabled) ensureAdvancedSeed();
+  resetTestResults();
+  render();
+});
+
+qsa(".password-toggle").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = $(button.dataset.passwordInput);
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.setAttribute(
+      "aria-label",
+      `${show ? "隐藏" : "显示"} ${button.dataset.passwordInput.includes("socks") ? "SOCKS" : "HTTP"} 密码`
+    );
+    const use = button.querySelector("use");
+    use.setAttribute("href", show ? "#i-eye-off" : "#i-eye");
+  });
+});
+
+elements.masterButton.addEventListener("click", () => {
+  if (state.envActive) clearConfiguration();
+  else applyConfiguration();
+});
+
+elements.bannerApplyButton.addEventListener("click", applyConfiguration);
+
+elements.clearButton.addEventListener("click", () => {
+  if (!state.envActive && !Object.keys(getPreviewVars()).length) {
+    showToast("当前没有可清除的代理变量。");
+    return;
+  }
+  clearConfiguration();
+});
+
+elements.testButton.addEventListener("click", testChannels);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.settingsModal.hidden) {
+    closeSettings();
+    return;
+  }
+  trapModalFocus(event);
+});
+
+mediaDark.addEventListener("change", applyTheme);
+
+/* 标题栏拖拽与窗口按钮 */
+elements.dragRegion.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  if (event.target.closest("button")) return;
+  try {
+    win && win.startDragging();
+  } catch (err) {
+    showToast("拖拽失败：" + String(err), true);
+  }
+});
+elements.btnMin.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  try {
+    win && win.minimize();
+  } catch (err) {
+    showToast("最小化失败：" + String(err), true);
+  }
+});
+elements.btnClose.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  try {
+    win && win.hide();
+  } catch (err) {
+    showToast("关闭失败：" + String(err), true);
   }
 });
 
 /* 托盘动作回推 */
 listen("proxyenv://env-changed", () => refresh());
-listen("proxyenv://tray-error", (e) => toast(String(e.payload), true));
+listen("proxyenv://tray-error", (e) => showToast(String(e.payload), true));
 listen("proxyenv://tray-test-result", (e) => {
-  const r = e.payload;
-  els.testResult.classList.remove("hidden");
-  if (r.ok) {
-    els.testResult.className = "test-result ok";
-    els.testResult.textContent = `托盘测试 · 连接成功，延迟 ${r.latency_ms} ms`;
-  } else {
-    els.testResult.className = "test-result fail";
-    els.testResult.textContent = `托盘测试失败：${r.error || "未知错误"}`;
+  const results = Array.isArray(e.payload) ? e.payload : [];
+  if (!results.length) {
+    showToast("托盘测试：当前没有可测试的通道", true);
+    return;
   }
+  elements.testPanel.hidden = false;
+  elements.testPanel.dataset.started = "true";
+  const seen = [];
+  results.forEach((r) => {
+    const row = r.channel === "socks" ? elements.socksResult : elements.httpResult;
+    seen.push(r.channel);
+    if (r.ok) setResultRow(row, "ok", `托盘测试 · 往返延迟 ${r.latency_ms} ms。`);
+    else setResultRow(row, "fail", `托盘测试失败：${r.error || "未知错误"}`);
+  });
+  ["http", "socks"].forEach((channel) => {
+    if (!seen.includes(channel)) {
+      const row = channel === "socks" ? elements.socksResult : elements.httpResult;
+      setResultRow(row, "idle", "本次托盘测试未包含该通道。");
+    }
+  });
+  renderTestAvailability();
 });
 
 /* ---------- 启动 ---------- */
 applyTheme();
+attachValidationEvents();
+attachFormEvents();
+render();
 refresh();
