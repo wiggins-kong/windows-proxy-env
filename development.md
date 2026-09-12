@@ -2,13 +2,13 @@
 
 ## 当前状态
 
-当前版本：`1.0.1`
+当前版本：`1.1.0`
 
-项目已经完成 Windows 便携版的核心功能和 GitHub Actions 发布链路，并完成圆角品牌 logo、应用图标和托盘图标的统一。当前重点仍是 HTTP(S) 与 SOCKS 双通道改造，以及发布稳定性和后续签名支持。
+项目已经完成 Windows 便携版的核心功能、HTTP(S) 与 SOCKS 双通道改造和 GitHub Actions 发布链路，应用图标、托盘图标与标题栏 logo 统一为概念 C「轨道路由」。当前重点转为发布稳定性、代码签名和自动化测试。
 
 ## 当前迭代：HTTP(S) 与 SOCKS 双通道
 
-状态：双通道改造已落地（UI 来自 `demo/two-column.html`，后端在 `src-tauri/`），logo 换成概念 C「轨道路由」，当前进入收尾验证阶段。
+状态：双通道改造已随 `v1.1.0` 发布（UI 来自 `demo/two-column.html`，后端在 `src-tauri/`），当前进入使用反馈与细节冻结阶段。
 
 目标行为：
 
@@ -49,6 +49,7 @@
 - [x] 托盘常驻、状态图标、菜单联动和单实例保护
 - [x] 开机自启、静默启动、主题跟随系统、字号设置
 - [x] 配置已更改横幅与无感应用更改
+- [x] HTTP(S) 与 SOCKS 双通道（独立开关、复用地址、分通道测试）与左右分栏界面
 - [x] GitHub Actions 标签发布流程
 - [x] 项目文档、更新日志和开发说明
 - [x] 圆角应用 logo、标题栏 SVG 与全套平台图标（概念 C「轨道路由」，标题栏/任务栏/托盘同一几何）
@@ -141,7 +142,7 @@ python make_tray_icons.py
 2. 在 `changelog.md` 顶部添加对应版本记录。
 3. 本地执行 release 构建并完成启动检查。
 4. 提交并推送 `main`。
-5. 创建并推送版本标签，例如 `git tag -a v1.0.1 -m "ProxyEnv v1.0.1"`。
+5. 创建并推送版本标签，例如 `git tag -a v1.1.0 -m "ProxyEnv v1.1.0"`。
 6. GitHub Actions 构建 Windows 可执行文件，并使用 `changelog.md` 创建 Release。
 
 ## 验证清单
