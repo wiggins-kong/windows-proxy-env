@@ -8,10 +8,11 @@
 - 细节版（>= 64px）：完整的轨道/光点/玻璃球，用于 app-icon、大图标、商店与 iOS/Android 大尺寸。
 - 简化版（< 64px 与托盘）：同一造型去掉细碎元素——加粗的交叉轨道 + 实心白核心，避免小尺寸糊成一块。
 """
+import io
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
-import math
 
 SIZE = 1024
 SCALE = 2
@@ -235,20 +236,41 @@ for filename, size in {
 }.items():
     save_png(filename, size)
 
-# .ico：每个尺寸都放"刚好那么大"的那张图——小尺寸用简化版，不做跨尺寸缩放
-ico_sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-ico_extra = []
-for size in ico_sizes:
-    px = size[0]
-    if px == 256:
-        continue
-    ico_extra.append(variant_for(px))
-detail_256.save(
-    ROOT / "src-tauri" / "icons" / "icon.ico",
-    format="ICO",
-    sizes=ico_sizes,
-    append_images=ico_extra,
-)
+# .ico：自己按顺序写目录项——Windows 的 shell 按尺寸挑层，而 Tauri 取 entries()[0]
+# 当作窗口图标（任务栏/悬停预览/Alt-Tab 都用它），所以第一项放大的简化版，
+# 避免 16px 被放大成模糊的窗口图标（PIL 保存会按尺寸升序排列，第一项必然是 16px）。
+ICO_LAYOUT = [128, 256, 64, 48, 32, 24, 16]
+
+
+def write_ico(path, layout):
+    images = [(size, variant_for(size)) for size in layout]
+
+    header = bytearray()
+    header += (0).to_bytes(2, "little")      # reserved
+    header += (1).to_bytes(2, "little")      # type: icon
+    header += len(images).to_bytes(2, "little")
+
+    payloads = []
+    for size, im in images:
+        buf = io.BytesIO()
+        im.resize((size, size), Image.Resampling.LANCZOS).save(buf, format="PNG")
+        payloads.append(buf.getvalue())
+
+    offset = len(header) + 16 * len(images)
+    directory = bytearray()
+    for (size, _), payload in zip(images, payloads):
+        directory += bytes([size if size < 256 else 0, size if size < 256 else 0, 0, 0])
+        directory += (1).to_bytes(2, "little")     # planes
+        directory += (32).to_bytes(2, "little")    # bit count
+        directory += len(payload).to_bytes(4, "little")
+        directory += offset.to_bytes(4, "little")
+        offset += len(payload)
+
+    with open(path, "wb") as fp:
+        fp.write(bytes(header) + bytes(directory) + b"".join(payloads))
+
+
+write_ico(ROOT / "src-tauri" / "icons" / "icon.ico", ICO_LAYOUT)
 detail.save(ROOT / "src-tauri" / "icons" / "icon.icns", format="ICNS")
 
 # Android
@@ -288,4 +310,4 @@ for filename, size in {
 
 print("detail:", output)
 print("small :", small_output)
-print("themes:", len(ico_sizes), "ico layers,", DETAIL_MIN, "px 以下用简化版")
+print("ico   :", ICO_LAYOUT, "(", DETAIL_MIN, "px 以下用简化版 )")

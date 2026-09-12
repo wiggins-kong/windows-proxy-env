@@ -133,6 +133,8 @@ python make_tray_icons.py
 
 设计源是 `ui/assets/proxyenv-logo.svg`：改 logo 时先改这个 SVG，再按同样的几何更新 `make_icon.py`（脚本按 SVG 的 128 视图框逐项对应，乘 `UNIT = S/128`），否则标题栏和任务栏图标会不一致。
 
+`.ico` 的层顺序是有意义的：Tauri 取 `entries()[0]` 作为**窗口图标**（任务栏、悬停预览、Alt-Tab 都用它），PIL 的 ICO 保存按尺寸升序排列（第一项必是 16px，会被放大成糊图），所以 `make_icon.py` 自己按 `ICO_LAYOUT` 写目录项，第一项放 128px 简化版。验证方法：`SendMessage(hwnd, WM_GETICON, ICON_SMALL, 0)` 取到的 HICON 尺寸应当等于你期望的那一层。
+
 ## 发布流程
 
 1. 修改 `src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 中的版本号。
